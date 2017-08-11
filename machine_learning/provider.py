@@ -6,6 +6,10 @@ import os
 import traceback
 import random
 
+INPUT_SIZE = 450
+NUM_STEPS = 10
+OUTPUT_SIZE = 3
+
 
 class Provider(object):
     model_sample = {
@@ -14,12 +18,15 @@ class Provider(object):
             'learning_rate': 1.0,
             'max_grad_norm': 5,
             'num_layers': 2,
-            'hidden_size': 200,
+            'hidden_size': 300,
             'max_epoch': 4,
             'max_max_epoch': 13,
             'keep_prob': 1.0,
             'lr_decay': 0.5,
             'batch_size': 16,
+            'input_size': INPUT_SIZE,
+            'num_steps': NUM_STEPS,
+            'output_size': OUTPUT_SIZE
         },
         'm': {
             'init_scale': 0.05,
@@ -32,6 +39,9 @@ class Provider(object):
             'keep_prob': 0.5,
             'lr_decay': 0.8,
             'batch_size': 128,
+            'input_size': INPUT_SIZE,
+            'num_steps': NUM_STEPS,
+            'output_size': OUTPUT_SIZE
         },
         'l': {
             'init_scale': 0.04,
@@ -44,6 +54,9 @@ class Provider(object):
             'keep_prob': 0.35,
             'lr_decay': 1. / 1.15,
             'batch_size': 128,
+            'input_size': INPUT_SIZE,
+            'num_steps': NUM_STEPS,
+            'output_size': OUTPUT_SIZE
         },
         't': {
             'init_scale': 0.05,
@@ -56,6 +69,9 @@ class Provider(object):
             'keep_prob': 0.5,
             'lr_decay': 0.8,
             'batch_size': 32,
+            'input_size': INPUT_SIZE,
+            'num_steps': NUM_STEPS,
+            'output_size': OUTPUT_SIZE
         },
     }
 
@@ -87,10 +103,16 @@ class Provider(object):
     def generate_data(self, tag, file_dir):
         raw_data = np.load(file_dir)
         new_data = []
+        if tag == 0:
+            tag_data = [1, 0, 0]
+        elif tag == 1:
+            tag_data = [0, 1, 0]
+        else:
+            tag_data = [0, 0, 1]
         for data in raw_data:
-            op_data = data[:, :, :150]
+            op_data = data[:, :, :INPUT_SIZE // 3]
             op_data = np.reshape(op_data, (op_data.shape[0], -1))
-            new_data.append([op_data, tag])
+            new_data.append([op_data, tag_data])
         return new_data
 
     def get_trainable_data(self, data):
@@ -99,7 +121,7 @@ class Provider(object):
         for sub_data in data:
             x.append(sub_data[0])
             y.append(sub_data[1])
-        return [x, y]
+        return [np.array(x), np.array(y)]
 
     def _read_data(self):
         self.data_config = json.load(open(self.data_config_dir, 'r'))
@@ -112,8 +134,6 @@ class Provider(object):
         self.training_data = self.get_trainable_data(self.data[:training_num])
         self.test_data = self.get_trainable_data(self.data[training_num:])
 
-
-
     def get_config(self):
         return self.model_config
 
@@ -124,8 +144,6 @@ class Provider(object):
             return len(self.test_data[0]) - 1
         else:
             return None
-
-
 
     def __call__(self):
         self.status = self.status.strip().lower()
