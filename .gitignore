@@ -1,0 +1,6 @@
+*.doc
+*.docx
+/data/**
+/env/**
+*/.idea/**
+.idea/**
