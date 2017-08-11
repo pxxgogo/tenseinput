@@ -17,7 +17,7 @@ def fft(window_data):
 
 
 def fft_process(acc_data):
-    window_data = [[0 for i in range(WINDOW_SIZE)], [0 for i in range(WINDOW_SIZE)], [0 for i in range(WINDOW_SIZE)]]
+    window_data = np.array([[0 for i in range(WINDOW_SIZE)], [0 for i in range(WINDOW_SIZE)], [0 for i in range(WINDOW_SIZE)]])
     acc_index = 0
     index = 0
     sample_num = 0
@@ -28,15 +28,16 @@ def fft_process(acc_data):
         num = [acc_data[i][acc_index] for i in range(3)]
         acc_index += 1
         for i in range(3):
-            window_data[i][index] = num[i]
+            window_data[i, index] = num[i]
         index += 1
         sample_num += 1
         if index == WINDOW_SIZE:
             index = 0
         if sample_num == SAMPLE_SIZE:
-            fft_data = fft(window_data)
-            acc_fft_data.append(fft_data)
             sample_num = 0
+            ret_data = np.concatenate([window_data[:, index:], window_data[:, :index]], axis=1)
+            fft_data = fft(ret_data)
+            acc_fft_data.append(fft_data)
             fft_num += 1
             # if fft_num % 1000 == 0:
             #     print(fft_num)

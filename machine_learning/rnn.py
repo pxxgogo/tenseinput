@@ -37,11 +37,6 @@ class Model(object):
         self._input_data = tf.placeholder(data_type(), [self.batch_size, self.num_steps, self.input_size])
         self._targets = tf.placeholder(tf.int16, [self.batch_size, self.output_size])
 
-        # Slightly better results can be obtained with forget gate biases
-        # initialized to 1 but the hyperparameters of the model would need to be
-        # different than reported in the paper.
-
-
         with tf.device("/gpu:0"):
             lstm_cell_list = []
             for i in range(config['num_layers']):
@@ -60,29 +55,17 @@ class Model(object):
         else:
             inputs = self._input_data
 
-        # Simplified version of tensorflow.models.rnn.rnn.py's rnn().
-        # This builds an unrolled LSTM for tutorial purposes only.
-        # In general, use the rnn() or state_saving_rnn() from rnn.py.
-        #
-        # The alternative version of the code below is:
-        #
-        # inputs = [tf.squeeze(input_, [1])
-        #           for input_ in tf.split(1, num_steps, inputs)]
-        # outputs, state = tf.nn.rnn(cell, inputs, initial_state=self._initial_state)
-        outputs = []
-        state = self._initial_state
-        cell_output = None
         with tf.variable_scope("RNN"):
-            for time_step in range(self.num_steps):
-                if time_step > 0:
-                    tf.get_variable_scope().reuse_variables()
-                (cell_output, state) = cell(inputs[:, time_step, :], state)
+            outputs, last_states = tf.nn.dynamic_rnn(
+                cell=cell,
+                dtype=data_type(),
+                inputs=inputs, initial_state=self._initial_state)
 
-        output = cell_output
+        output = outputs[:, -1, :]
         softmax_w = tf.get_variable(
             "softmax_w", [self.hidden_size, self.output_size], dtype=data_type())
         softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
-        logits = tf.matmul(output, softmax_w) + softmax_b
+        self.logits = logits = tf.matmul(output, softmax_w) + softmax_b
 
         self._cost = cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits))
         self._predict_op = tf.argmax(logits, 1)
@@ -135,44 +118,57 @@ def check_ans(tags, predict_vals):
     No = 0
     length = tags.shape[0]
     right_num = 0
+    debug_val = 0
     while No < length:
         tag = tags[No]
         predict_val = predict_vals[No]
         if tag[predict_val] == 1:
             right_num += 1
+        else:
+            if tag[0] == 1:
+                debug_val += 1
         No += 1
-    return right_num
+    return right_num, debug_val
 
 
 # @make_spin(Spin1, "Running epoch...")
-def run_epoch(session, model, provider, data, eval_op, verbose=False):
+def run_epoch(session, model, provider, status, eval_op, verbose=False):
     """Runs the model on the given data."""
     start_time = time.time()
     stage_time = time.time()
     costs = 0.0
     iters = 0
     right_num = 0
+    debug_val = 0
     sum = 0
-    provider.status = data
+    provider.status = status
     for step, (x, y) in enumerate(provider()):
         fetches = [model.cost, model.predict_op, eval_op]
+        if status == 'test':
+            fetches.append(model.logits)
         feed_dict = {}
         feed_dict[model.input_data] = x
         feed_dict[model.targets] = y
-        cost, predict_val, _ = session.run(fetches, feed_dict)
-        right_num += check_ans(y, predict_val)
+        if status == 'test':
+            cost, predict_val, _, logits = session.run(fetches, feed_dict)
+            print(y, logits)
+        else:
+            cost, predict_val, _ = session.run(fetches, feed_dict)
+        right_num_sub, debug_val_sub = check_ans(y, predict_val)
+        right_num += right_num_sub
+        debug_val += debug_val_sub
         sum += y.shape[0]
         costs += cost
         iters += 1
         epoch_size = provider.get_epoch_size()
         divider_10 = epoch_size // 10
         if verbose and step % divider_10 == 0:
-            print("%.3f perplexity: %.3f speed: %.0f wps time cost: %.3fs precision: %.3f" %
+            print("%.3f perplexity: %.3f speed: %.0f wps time cost: %.3fs precision: %.3f debug_value: %.3f" %
                   (step * 1.0 / epoch_size, np.exp(costs / iters),
-                   sum / (time.time() - start_time), time.time() - stage_time, right_num / sum))
+                   sum / (time.time() - start_time), time.time() - stage_time, right_num / sum, debug_val / sum))
             stage_time = time.time()
 
-    return np.exp(costs / iters), right_num / sum
+    return np.exp(costs / iters), right_num / sum, debug_val / sum
 
 
 def main():
@@ -214,15 +210,15 @@ def main():
             m.assign_lr(session, config['learning_rate'] * lr_decay)
             print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
             print("Starting Time:", datetime.now())
-            train_perplexity, precision = run_epoch(session, m, provider, 'train', m.train_op, verbose=True)
+            train_perplexity, precision, debug_val = run_epoch(session, m, provider, 'train', m.train_op, verbose=True)
             print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
             print("Ending Time:", datetime.now())
             save_path = saver.save(session, './model/misscut_rnn_model', global_step=i)
             print("Model saved in file: %s" % save_path)
             print("Starting Time:", datetime.now())
-            test_perplexity, precision = run_epoch(session, mtest, provider, 'test', tf.no_op())
+            test_perplexity, precision, debug_val = run_epoch(session, mtest, provider, 'test', tf.no_op())
             print("Test Perplexity: %.3f" % test_perplexity)
-            print("Test Precision: %.3f" % precision)
+            print("Test Precision: %.3f (%.3f)" % (precision, debug_val))
             print("Ending Time:", datetime.now())
 
 
