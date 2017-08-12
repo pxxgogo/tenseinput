@@ -21,8 +21,14 @@ def operation(data, acce_operation):
     ret, debug_val = acce_operation.feed_data(freqs)
     global debug_No
     if not ret == -1:
-        print(debug_No, ret, debug_val)
-        # print(freqs[:, 0])
+        logits = debug_val[0]
+        if logits[2] > 2.5:
+            ret = 2
+        elif logits[1] > 2.5:
+            ret = 1
+        else:
+            ret = 0
+        print(debug_No, ret, logits)
         debug_No += 1
 
 
@@ -53,7 +59,7 @@ def run(acce_operation):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_dir', type=str, default="../model/rnn_1")
+    parser.add_argument('--model_dir', type=str, default="../model/rnn_acce_5_2")
     args = parser.parse_args()
     model_dir = args.model_dir
     acce_operation = Acce_operation(model_dir)

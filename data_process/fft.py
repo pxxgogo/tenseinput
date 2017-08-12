@@ -2,10 +2,12 @@ import argparse
 import json
 
 import numpy as np
+import random
 
 WINDOW_SIZE = 1500
 SAMPLE_SIZE = 400
-SPLIT_WINDOW_SIZE = 10
+SPLIT_WINDOW_SIZE = 5
+MAX_DATA_NUM = 1300
 
 
 def fft(window_data):
@@ -50,16 +52,17 @@ def split_data(acc_fft_data):
     num = acc_fft_data.shape[0] // SPLIT_WINDOW_SIZE
     for i in range(num):
         new_acc_fft_data.append(acc_fft_data[i * SPLIT_WINDOW_SIZE: (i + 1) * SPLIT_WINDOW_SIZE])
-    new_acc_fft_data = np.array(new_acc_fft_data)
+    random.shuffle(new_acc_fft_data)
+    new_acc_fft_data = np.array(new_acc_fft_data[:MAX_DATA_NUM])
     return new_acc_fft_data
 
 
 def prune_data(acc_fft_data):
     new_acc_fft_data = []
     for sub_fft_data in acc_fft_data:
-        if len(sub_fft_data) < 10:
+        if len(sub_fft_data) < SPLIT_WINDOW_SIZE:
             continue
-        new_acc_fft_data.append(sub_fft_data[:10])
+        new_acc_fft_data.append(sub_fft_data[:SPLIT_WINDOW_SIZE])
     new_acc_fft_data = np.array(new_acc_fft_data)
     return new_acc_fft_data
 
@@ -72,6 +75,7 @@ def data_process(acc_file_name, tag):
         acc_fft_data = fft_process(acc_sub_data)
         # print(len(acc_fft_data))
         acc_fft_data = split_data(acc_fft_data)
+
         return acc_fft_data
     else:
         acc_fft_data = []

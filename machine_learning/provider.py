@@ -7,7 +7,7 @@ import traceback
 import random
 
 INPUT_SIZE = 450
-NUM_STEPS = 10
+NUM_STEPS = 5
 OUTPUT_SIZE = 3
 
 
@@ -17,8 +17,8 @@ class Provider(object):
             'init_scale': 0.1,
             'learning_rate': 1.0,
             'max_grad_norm': 5,
-            'num_layers': 1,
-            'hidden_size': 50,
+            'num_layers': 2,
+            'hidden_size': 300,
             'max_epoch': 13,
             'max_max_epoch': 39,
             'keep_prob': 1.0,
@@ -119,8 +119,9 @@ class Provider(object):
         x = []
         y = []
         for sub_data in data:
-            x.append(sub_data[0])
+            x.append(sub_data[0][-NUM_STEPS:])
             y.append(sub_data[1])
+
         return [np.array(x), np.array(y)]
 
     def _read_data(self):

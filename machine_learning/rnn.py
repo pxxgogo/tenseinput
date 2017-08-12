@@ -48,7 +48,6 @@ class Model(object):
 
             cell = tf.contrib.rnn.MultiRNNCell(lstm_cell_list, state_is_tuple=True)
 
-        self._initial_state = cell.zero_state(self.batch_size, data_type())
 
         if is_training and config['keep_prob'] < 1:
             inputs = tf.nn.dropout(self._input_data, config['keep_prob'])
@@ -59,7 +58,7 @@ class Model(object):
             outputs, last_states = tf.nn.dynamic_rnn(
                 cell=cell,
                 dtype=data_type(),
-                inputs=inputs, initial_state=self._initial_state)
+                inputs=inputs)
 
         output = outputs[:, -1, :]
         softmax_w = tf.get_variable(
@@ -94,9 +93,9 @@ class Model(object):
     def targets(self):
         return self._targets
 
-    @property
-    def initial_state(self):
-        return self._initial_state
+    # @property
+    # def initial_state(self):
+    #     return self._initial_state
 
     @property
     def cost(self):
@@ -151,7 +150,7 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
         feed_dict[model.targets] = y
         if status == 'test':
             cost, predict_val, _, logits = session.run(fetches, feed_dict)
-            print(y, logits)
+            # print(y, logits)
         else:
             cost, predict_val, _ = session.run(fetches, feed_dict)
         right_num_sub, debug_val_sub = check_ans(y, predict_val)

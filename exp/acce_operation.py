@@ -17,7 +17,8 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 FLAGS = flags.FLAGS
-SAMPLE_NUM = 5
+SAMPLE_NUM = 1
+DEVICES = "/cpu:0"
 
 
 def data_type():
@@ -40,7 +41,7 @@ class Model(object):
     #     # different than reported in the paper.
     #
     #
-    #     with tf.device("/gpu:0"):
+    #     with tf.device(DEVICES):
     #         lstm_cell_list = []
     #         for i in range(config['num_layers']):
     #             lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size, forget_bias=0.0, state_is_tuple=True,
@@ -77,7 +78,7 @@ class Model(object):
 
         self._input_data = tf.placeholder(data_type(), [self.batch_size, self.num_steps, self.input_size])
 
-        with tf.device("/gpu:0"):
+        with tf.device(DEVICES):
             lstm_cell_list = []
             for i in range(config['num_layers']):
                 lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size, forget_bias=0.0, state_is_tuple=True,
@@ -85,13 +86,12 @@ class Model(object):
                 lstm_cell_list.append(lstm_cell)
             cell = tf.contrib.rnn.MultiRNNCell(lstm_cell_list, state_is_tuple=True)
         inputs = self._input_data
-        self._initial_state = cell.zero_state(self.batch_size, data_type())
+        # self._initial_state = cell.zero_state(self.batch_size, data_type())
         with tf.variable_scope("RNN"):
             outputs, last_states = tf.nn.dynamic_rnn(
                 cell=cell,
                 dtype=data_type(),
-                inputs=inputs,
-                initial_state=self._initial_state)
+                inputs=inputs)
         # print(outputs.shape)
         self.debug_val = outputs
         self.output = output = outputs[:, -1, :]
@@ -135,9 +135,12 @@ class Acce_operation(object):
         for v in tf.global_variables():
             print(v.name)
         self.num_steps = self.config["num_steps"]
+        # print(self.num_steps)
         self.data = np.zeros([1, self.num_steps, self.config["input_size"]])
         self.index = 0
         self.sample_index = 0
+        self.debug_index_list = np.zeros([1, self.num_steps])
+        self.debug_index = 0
 
     def operate_data(self, data):
         op_data = data[:, :self.config["input_size"] // 3]
@@ -145,23 +148,38 @@ class Acce_operation(object):
         # print(op_data.shape)
         return op_data
 
+    def clean(self):
+        self.data = np.zeros([1, self.num_steps, self.config["input_size"]])
+        self.index = 0
+        self.sample_index = 0
+        self.debug_index_list = np.zeros([1, self.num_steps])
+        self.debug_index = 0
+
+    def clean_partly(self):
+        self.debug_index_list = np.zeros([1, self.num_steps])
+        self.debug_index = 0
+
     def feed_data(self, data):
         data = self.operate_data(data)
-        self.data[0, self.index] = data
+        self.data[0][self.index] = data[:]
+        self.debug_index_list[0][self.index] = self.debug_index
         self.sample_index += 1
         self.index += 1
+        self.debug_index += 1
         if self.index == self.num_steps:
             self.index = 0
         if self.sample_index == SAMPLE_NUM:
             self.sample_index = 0
             # print(self.data[0, 0, 0:50])
-            window_data = np.concatenate([self.data[:, self.index:, :], self.data[:, :self.index, :]], axis=1)
+            window_data = np.concatenate([self.data[:, self.index:], self.data[:, :self.index]], axis=1)
+            debug_index_list = np.concatenate([self.debug_index_list[:, self.index:], self.debug_index_list[:, :self.index]], axis=1)
+            # print(window_data[0])
+            # print(debug_index_list)
             return self.rnn_classify(window_data)
         else:
             return -1, -1
 
     def rnn_classify(self, data):
-        self.state = self.session.run(self.model.initial_state)
         fetches = [self.model.predict_op, self.model.logits, self.model.debug_val]
         feed_dict = {}
         feed_dict[self.model.input_data] = data
