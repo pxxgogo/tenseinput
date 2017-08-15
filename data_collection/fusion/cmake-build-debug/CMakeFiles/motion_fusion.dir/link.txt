@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/motion_fusion.dir/main.cpp.o CMakeFiles/motion_fusion.dir/attitude_estimator.cpp.o  -o motion_fusion 
