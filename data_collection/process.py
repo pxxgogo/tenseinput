@@ -15,7 +15,7 @@ def read_data(data, offset):
     arr = []
     for i in range(3):
         arr.append(int(data[i * 2 + offset] << 8 | data[i * 2 + 1 + offset]))
-        if arr[i] > 2 ** 15:
+        if arr[i] >= 2 ** 15:
             arr[i] -= 2 ** 16
     return arr
 
@@ -46,13 +46,14 @@ while True:
 
     # attitude estimation
     vp = est.feed_data(dt, raw_gyr, raw_acc)
+    vp = vp * 4096
 
     raw_datafile.write(str(ts) + ' ' + str(raw_gyr[1]) + ' ' + str(raw_gyr[2]) + ' ' + str(raw_acc[0]) + ' ' + str(raw_acc[1]) + ' ' + str(raw_acc[2]) + ' ' + str(raw_gyr[0]) + '\n')
     datafile.write(str(ts) + ' ' + str(vp[0]) + ' ' + str(vp[1]) + ' ' + str(vp[2]) + '\n')
 
     count += 1
 
-    if count % 80 == 0:
+    if count % 800 == 0:
         count = 0
         # print("%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f" % (acc[0], acc[1], acc[2], gyr[0], gyr[1], gyr[2], q[0], q[1], q[2], q[3]),
             # end='\r')

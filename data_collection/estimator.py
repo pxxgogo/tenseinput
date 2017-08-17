@@ -15,7 +15,7 @@ class Estimator(object):
 
     def __init__(self):
         # load dynamic library
-        self.lib = cdll.LoadLibrary('fusion/libest.so')
+        self.lib = cdll.LoadLibrary('./libest.so')
 
 
         # set ctypes type requirements

@@ -29,7 +29,7 @@ def reader_acc(acc_file_name, key_timestamps, tense_tag):
             choose_flag = False
             acc_data_per_gesture = [[], [], []]
             for data_str in acc_raw_data_list:
-                acc_raw_data = [int(x) for x in data_str.split()]
+                acc_raw_data = [float(x) for x in data_str.split()]
                 if choose_flag and acc_raw_data[0] >= key_timestamps[key_No][1]:
                     choose_flag = False
                     key_No += 1
@@ -47,7 +47,7 @@ def reader_acc(acc_file_name, key_timestamps, tense_tag):
         else:
             acc_data_per_gesture = [[], [], []]
             for data_str in acc_raw_data_list:
-                acc_raw_data = [int(x) for x in data_str.split()]
+                acc_raw_data = [float(x) for x in data_str.split()]
                 acc_data_per_gesture[0].append(acc_raw_data[1])
                 acc_data_per_gesture[1].append(acc_raw_data[2])
                 acc_data_per_gesture[2].append(acc_raw_data[3])

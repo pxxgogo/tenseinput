@@ -1,8 +1,11 @@
 *.doc
 *.docx
 /data/**
+/data_collection/*.txt
+/data_collection/*.csv
 /env/**
 */.idea/**
 .idea/**
 /model/**
 */__pycache__/**
+*.swap

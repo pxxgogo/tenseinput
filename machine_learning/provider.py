@@ -6,7 +6,7 @@ import os
 import traceback
 import random
 
-INPUT_SIZE = 450
+INPUT_SIZE = 600
 NUM_STEPS = 5
 OUTPUT_SIZE = 3
 

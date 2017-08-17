@@ -4,9 +4,9 @@ import json
 import numpy as np
 import random
 
-WINDOW_SIZE = 1500
-SAMPLE_SIZE = 400
-SPLIT_WINDOW_SIZE = 5
+WINDOW_SIZE = 400
+SAMPLE_SIZE = 100
+SPLIT_WINDOW_SIZE = 10
 MAX_DATA_NUM = 1300
 
 

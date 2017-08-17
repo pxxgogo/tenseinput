@@ -1,15 +1,16 @@
 import serial
-import datetime
 
 import numpy as np
 import time
+from estimator import Estimator
+
 from acce_operation import Acce_operation
 import argparse
 
 debug_No = 0
 a = serial.Serial('/dev/ttyACM0', 115200)
-WINDOW_SIZE = 1500
-SAMPLE_SIZE = 400
+WINDOW_SIZE = 400
+SAMPLE_SIZE = 100
 
 
 def operation(data, acce_operation):
@@ -22,32 +23,52 @@ def operation(data, acce_operation):
     global debug_No
     if not ret == -1:
         logits = debug_val[0]
-        if logits[2] > 2.5:
-            ret = 2
-        elif logits[1] > 2.5:
-            ret = 1
-        else:
-            ret = 0
+        # if logits[2] > 2.5:
+        #     ret = 2
+        # elif logits[1] > 2.5:
+        #     ret = 1
+        # else:
+        #     ret = 0
         print(debug_No, ret, logits)
         debug_No += 1
 
 
+def read_data(data, offset):
+    arr = []
+    for i in range(3):
+        arr.append(int(data[i * 2 + offset] << 8 | data[i * 2 + 1 + offset]))
+        if arr[i] >= 2 ** 15:
+            arr[i] -= 2 ** 16
+    return arr
+
+
 def run(acce_operation):
+    est = Estimator()
+
     a.write(b'\x01')
     window_data = np.array([[0 for i in range(WINDOW_SIZE)], [0 for i in range(WINDOW_SIZE)],
                 [0 for i in range(WINDOW_SIZE)]])
     index = 0
     sample_num = 0
+    lastTp = time.time()
+
     while True:
-        data = a.read(6)
+        data = a.read(14)
+        raw_acc = read_data(data, 0)
+        raw_gyr = read_data(data, 8)
+
         # print(data)
-        num = []
+
+        tp = time.time()
+        dt = tp - lastTp
+        lastTp = tp
+
+        # attitude estimation
+        vp = est.feed_data(dt, raw_gyr, raw_acc)
+        # print(vp, end="\r")
         for i in range(3):
-            num.append(int(data[i * 2] << 8 | data[i * 2 + 1]))
-            if num[i] > 2 ** 15:
-                num[i] -= 2 ** 16
-        for i in range(3):
-            window_data[i][index] = num[i]
+            window_data[i][index] = vp[i] * 4096
+
         index += 1
         sample_num += 1
         if index == WINDOW_SIZE:
@@ -59,7 +80,7 @@ def run(acce_operation):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_dir', type=str, default="../model/rnn_acce_5_2")
+    parser.add_argument('--model_dir', type=str, default="../model/0816/rnn_1")
     args = parser.parse_args()
     model_dir = args.model_dir
     acce_operation = Acce_operation(model_dir)
