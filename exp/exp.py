@@ -6,6 +6,11 @@ from estimator import Estimator
 
 from acce_operation import Acce_operation
 import argparse
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+
+fig = plt.figure()
+fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure))
 
 debug_No = 0
 a = serial.Serial('/dev/ttyACM0', 115200)
@@ -30,6 +35,13 @@ def operation(data, acce_operation):
         # else:
         #     ret = 0
         print(debug_No, ret, logits)
+        if ret == 0:
+            fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure, fc="Grey"))
+        else:
+            fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure, fc="Red"))
+        fig.show()
+        plt.pause(0.05)
+        fig.clf()
         debug_No += 1
 
 
@@ -47,7 +59,7 @@ def run(acce_operation):
 
     a.write(b'\x01')
     window_data = np.array([[0 for i in range(WINDOW_SIZE)], [0 for i in range(WINDOW_SIZE)],
-                [0 for i in range(WINDOW_SIZE)]])
+                            [0 for i in range(WINDOW_SIZE)]])
     index = 0
     sample_num = 0
     lastTp = time.time()
@@ -77,6 +89,7 @@ def run(acce_operation):
             sample_num = 0
             ret_data = np.concatenate([window_data[:, index:], window_data[:, :index]], axis=1)
             operation(ret_data, acce_operation)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

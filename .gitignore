@@ -8,4 +8,7 @@
 .idea/**
 /model/**
 */__pycache__/**
-*.swap
+**.swap
+**.swp
+
+

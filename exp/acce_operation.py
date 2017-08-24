@@ -28,47 +28,6 @@ def data_type():
 class Model(object):
     """The RNN model."""
 
-    # def __init__(self, is_training, config):
-    #     self.batch_size = 1
-    #     self.hidden_size = config['hidden_size']
-    #     self.input_size = config['input_size']
-    #     self.output_size = config['output_size']
-    #
-    #     self._input_data = tf.placeholder(data_type(), [self.batch_size, self.input_size])
-    #
-    #     # Slightly better results can be obtained with forget gate biases
-    #     # initialized to 1 but the hyperparameters of the model would need to be
-    #     # different than reported in the paper.
-    #
-    #
-    #     with tf.device(DEVICES):
-    #         lstm_cell_list = []
-    #         for i in range(config['num_layers']):
-    #             lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size, forget_bias=0.0, state_is_tuple=True,
-    #                                                      reuse=tf.get_variable_scope().reuse)
-    #             if is_training and config['keep_prob'] < 1:
-    #                 lstm_cell = tf.contrib.rnn.DropoutWrapper(lstm_cell, output_keep_prob=config['keep_prob'])
-    #             lstm_cell_list.append(lstm_cell)
-    #
-    #         cell = tf.contrib.rnn.MultiRNNCell(lstm_cell_list, state_is_tuple=True)
-    #
-    #     self._initial_state = cell.zero_state(self.batch_size, data_type())
-    #
-    #     inputs = self._input_data
-    #
-    #     state = self._initial_state
-    #     with tf.variable_scope("RNN"):
-    #         (cell_output, state) = cell(inputs, state)
-    #
-    #     output = cell_output
-    #     softmax_w = tf.get_variable(
-    #         "softmax_w", [self.hidden_size, self.output_size], dtype=data_type())
-    #     softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
-    #     logits = tf.matmul(output, softmax_w) + softmax_b
-    #     self._final_state = state
-    #
-    #     self._predict_op = tf.argmax(logits, 1)
-
     def __init__(self, config):
         self.hidden_size = config['hidden_size']
         self.input_size = config['input_size']
@@ -106,9 +65,6 @@ class Model(object):
     def input_data(self):
         return self._input_data
 
-    @property
-    def initial_state(self):
-        return self._initial_state
 
     # @property
     # def final_state(self):

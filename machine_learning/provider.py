@@ -17,8 +17,8 @@ class Provider(object):
             'init_scale': 0.1,
             'learning_rate': 1.0,
             'max_grad_norm': 5,
-            'num_layers': 2,
-            'hidden_size': 300,
+            'num_layers': 3,
+            'hidden_size': 500,
             'max_epoch': 13,
             'max_max_epoch': 39,
             'keep_prob': 1.0,
@@ -74,6 +74,8 @@ class Provider(object):
             'output_size': OUTPUT_SIZE
         },
     }
+    CORPUS_CONFIG_NAME = "corpus_config.json"
+    FILENAMES = ["training_data.npy", "test_data.npy"]
 
     def __init__(self, config_dir):
         self.data_dir = ''
@@ -90,30 +92,20 @@ class Provider(object):
         self._read_data()
 
     def _parse_config(self, config_dir):
-        config = json.load(open(config_dir, 'r'))
+        with open(config_dir, 'r') as config_handle:
+            config = json.load(config_handle)
         self.data_dir = config['data_dir']
         self.model = config['model']
         self.model = self.model[0].lower()
         assert self.model in self.legal_model_size and op.isdir(self.data_dir) and os.access(self.data_dir, os.R_OK)
-        self.data_config_dir = op.join(self.data_dir, config['data_config_dir'])
         self.model_config = Provider.model_sample[self.model]
         self.batch_size = self.model_config['batch_size']
+        data_config_dir = op.join(self.data_dir, Provider.CORPUS_CONFIG_NAME)
+        with open(data_config_dir, 'r') as config_handle:
+            self.data_config = json.load(config_handle)
+        self.model_config["input_size"] = self.data_config["input_size"]
+        self.model_config["output_size"] = self.data_config["output_size"]
         print("finish parsing config")
-
-    def generate_data(self, tag, file_dir):
-        raw_data = np.load(file_dir)
-        new_data = []
-        if tag == 0:
-            tag_data = [1, 0, 0]
-        elif tag == 1:
-            tag_data = [0, 1, 0]
-        else:
-            tag_data = [0, 0, 1]
-        for data in raw_data:
-            op_data = data[:, :, :INPUT_SIZE // 3]
-            op_data = np.reshape(op_data, (op_data.shape[0], -1))
-            new_data.append([op_data, tag_data])
-        return new_data
 
     def get_trainable_data(self, data):
         x = []
@@ -125,15 +117,8 @@ class Provider(object):
         return [np.array(x), np.array(y)]
 
     def _read_data(self):
-        self.data_config = json.load(open(self.data_config_dir, 'r'))
-        self.data = []
-        for data_setting in self.data_config:
-            sub_data = self.generate_data(data_setting['tag'], op.join(self.data_dir, data_setting['file_name']))
-            self.data.extend(sub_data)
-        random.shuffle(self.data)
-        training_num = len(self.data) // 10 * 9
-        self.training_data = self.get_trainable_data(self.data[:training_num])
-        self.test_data = self.get_trainable_data(self.data[training_num:])
+        self.raw_training_data = np.load(op.join(self.data_dir, self.data_config["training_data"]))
+        self.test_data = self.get_trainable_data(np.load(op.join(self.data_dir, self.data_config["test_data"])))
 
     def get_config(self):
         return self.model_config
@@ -148,6 +133,8 @@ class Provider(object):
 
     def __call__(self):
         self.status = self.status.strip().lower()
+        np.random.shuffle(self.raw_training_data)
+        self.training_data = self.get_trainable_data(self.raw_training_data)
         epoch_size = self.get_epoch_size()
         print("epoch_size", epoch_size)
         if self.status == 'train':

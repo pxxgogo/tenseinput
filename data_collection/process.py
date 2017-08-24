@@ -45,11 +45,12 @@ while True:
     lastTp = tp
 
     # attitude estimation
-    vp = est.feed_data(dt, raw_gyr, raw_acc)
-    vp = vp * 4096
+    old_vp = est.feed_data(dt, raw_gyr, raw_acc)
+    vp = old_vp * 4096
 
     raw_datafile.write(str(ts) + ' ' + str(raw_gyr[1]) + ' ' + str(raw_gyr[2]) + ' ' + str(raw_acc[0]) + ' ' + str(raw_acc[1]) + ' ' + str(raw_acc[2]) + ' ' + str(raw_gyr[0]) + '\n')
     datafile.write(str(ts) + ' ' + str(vp[0]) + ' ' + str(vp[1]) + ' ' + str(vp[2]) + '\n')
+    print(old_vp, vp)
 
     count += 1
 

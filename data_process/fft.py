@@ -7,7 +7,7 @@ import random
 WINDOW_SIZE = 400
 SAMPLE_SIZE = 100
 SPLIT_WINDOW_SIZE = 10
-MAX_DATA_NUM = 1300
+MAX_DATA_NUM = 700
 
 
 def fft(window_data):

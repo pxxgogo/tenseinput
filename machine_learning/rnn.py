@@ -61,6 +61,7 @@ class Model(object):
                 inputs=inputs)
 
         output = outputs[:, -1, :]
+        # output = tf.reduce_mean(outputs, axis=1)
         softmax_w = tf.get_variable(
             "softmax_w", [self.hidden_size, self.output_size], dtype=data_type())
         softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
@@ -118,6 +119,8 @@ def check_ans(tags, predict_vals):
     length = tags.shape[0]
     right_num = 0
     debug_val = 0
+    # print(tags)
+    # print(predict_vals)
     while No < length:
         tag = tags[No]
         predict_val = predict_vals[No]
