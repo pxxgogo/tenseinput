@@ -6,15 +6,15 @@ from estimator import Estimator
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('input_path', type=str)
-    parser.add_argument('output_name', type=str)
-    parser.add_argument('--output_dir', type=str, default="../data/raw_data/0822")
+    parser.add_argument('output_path', type=str)
+    parser.add_argument('--estimator', type=int, default=1)
+
     args = parser.parse_args()
     input_path = args.input_path
-    output_dir = args.output_dir
-    output_name = args.output_name
-    output_path = os.path.join(output_dir, output_name)
+    output_path = args.output_path
+    est_flag = args.estimator
     output_file_handle = open(output_path, 'w')
-    est = Estimator()
+    est = Estimator(est_flag)
     with open(input_path) as file_handle:
         raw_data_list = file_handle.readlines()
     last_timestamp = -1

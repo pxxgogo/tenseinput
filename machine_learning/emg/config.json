@@ -1,0 +1,7 @@
+{
+  "data_dir": "../../data/training_data/0828/emg",
+  "batch_size": 64,
+  "input_size": 180,
+  "output_size": 2,
+  "output_type": 1
+}

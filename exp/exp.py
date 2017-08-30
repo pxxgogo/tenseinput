@@ -8,6 +8,7 @@ from acce_operation import Acce_operation
 import argparse
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.colors as colors
 
 fig = plt.figure()
 fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure))
@@ -16,7 +17,18 @@ debug_No = 0
 a = serial.Serial('/dev/ttyACM0', 115200)
 WINDOW_SIZE = 400
 SAMPLE_SIZE = 100
+result_window = np.zeros(5)
+result_pointer = 0
 
+def update_result_window(ret):
+    global result_pointer
+    global result_window
+    result_window[result_pointer] = ret
+    ret_raw = np.mean(result_window)
+    result_pointer += 1
+    if result_pointer == result_window.shape[0]:
+        result_pointer = 0
+    return ret_raw
 
 def operation(data, acce_operation):
     x = np.array(range(len(data[0]) // 2 + 1)) / len(data[0]) * 4000
@@ -34,11 +46,12 @@ def operation(data, acce_operation):
         #     ret = 1
         # else:
         #     ret = 0
-        print(debug_No, ret, logits)
+        ret = update_result_window(ret)
+
         if ret == 0:
-            fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure, fc="Grey"))
+            fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure, color=(ret, 0, 0)))
         else:
-            fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure, fc="Red"))
+            fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure, color=(ret, 0, 0)))
         fig.show()
         plt.pause(0.05)
         fig.clf()
@@ -93,7 +106,7 @@ def run(acce_operation):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_dir', type=str, default="../model/0816/rnn_1")
+    parser.add_argument('--model_dir', type=str, default="../model/0822/rnn_2")
     args = parser.parse_args()
     model_dir = args.model_dir
     acce_operation = Acce_operation(model_dir)

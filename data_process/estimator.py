@@ -4,16 +4,22 @@ from ctypes import cdll
 from ctypes import c_double
 
 # calibration constants for X, Y, Z components
-ACC_OFFSET = [-202.0281770191, -81.7801589269, 419.6444280899]
-GYR_OFFSET = [-15.353925709, -13.0307386379, 13.6007070723]
+ACC_OFFSET_1 = [-202.0281770191, -81.7801589269, 419.6444280899]
+GYR_OFFSET_1 = [-15.353925709, -13.0307386379, 13.6007070723]
 
-ACC_SCALE = [0.0023891523, 0.0023878861, 0.0023579114]
-GYR_SCALE = 0.001064225
+ACC_SCALE_1 = [0.0023891523, 0.0023878861, 0.0023579114]
+GYR_SCALE_1 = 0.001064225
+
+ACC_OFFSET_2 = [122.5744738301, 30.4468158626, 34.4573509276]
+GYR_OFFSET_2 = [-11.4545599896, 15.2462993345, 4.4647835565]
+
+ACC_SCALE_2 = [0.0023981123, 0.0023906275, 0.0023649804]
+GYR_SCALE_2 = 0.001064225
 
 
 class Estimator(object):
 
-    def __init__(self):
+    def __init__(self, flag=1):
         # load dynamic library
         self.lib = cdll.LoadLibrary('./libest.so')
 
@@ -25,6 +31,21 @@ class Estimator(object):
         self.lib.q1.restype = c_double
         self.lib.q2.restype = c_double
         self.lib.q3.restype = c_double
+        if flag == 1:
+            self.acc_offset = ACC_OFFSET_1
+            self.gyr_offset = GYR_OFFSET_1
+            self.acc_scale = ACC_SCALE_1
+            self.gyr_scale = GYR_SCALE_1
+        elif flag == 2:
+            self.acc_offset = ACC_OFFSET_2
+            self.gyr_offset = GYR_OFFSET_2
+            self.acc_scale = ACC_SCALE_2
+            self.gyr_scale = GYR_SCALE_2
+        else:
+            self.acc_offset = ACC_OFFSET_2
+            self.gyr_offset = GYR_OFFSET_2
+            self.acc_scale = ACC_SCALE_2
+            self.gyr_scale = GYR_SCALE_2
 
 
 
@@ -34,10 +55,10 @@ class Estimator(object):
         acc = [0.0, 0.0, 0.0]
         gyr = [0.0, 0.0, 0.0]
         for i in range(3):
-            acc[i] = float(raw_acc[i]) + ACC_OFFSET[i]
-            acc[i] *= ACC_SCALE[i]
-            gyr[i] = float(raw_gyr[i]) + GYR_OFFSET[i]
-            gyr[i] *= GYR_SCALE
+            acc[i] = float(raw_acc[i]) + self.acc_offset[i]
+            acc[i] *= self.acc_scale[i]
+            gyr[i] = float(raw_gyr[i]) + self.gyr_offset[i]
+            gyr[i] *= self.gyr_scale
 
         # attitude estimation
         self.lib.update_est(dt, gyr[0], gyr[1], gyr[2], acc[0], acc[1], acc[2])
