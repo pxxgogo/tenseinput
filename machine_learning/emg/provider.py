@@ -6,12 +6,24 @@ import os
 import traceback
 import random
 
-INPUT_SIZE = 600
-NUM_STEPS = 5
-OUTPUT_SIZE = 3
+INPUT_SIZE = 180
+OUTPUT_SIZE = 2
 
 
 class Provider(object):
+    model_sample = {
+        'init_scale': 0.1,
+        'learning_rate': 0.001,
+        'max_grad_norm': 5,
+        'max_epoch': 40,
+        'max_max_epoch': 40,
+        'keep_prob': 1.0,
+        'lr_decay': 0.1,
+        'batch_size': 16,
+        'input_channel': 1,
+        'input_size': INPUT_SIZE,
+        'output_size': OUTPUT_SIZE
+    }
     CORPUS_CONFIG_NAME = "corpus_config.json"
     FILENAMES = ["training_data.npy", "test_data.npy"]
 
@@ -36,10 +48,17 @@ class Provider(object):
         data_config_dir = op.join(self.data_dir, Provider.CORPUS_CONFIG_NAME)
         with open(data_config_dir, 'r') as config_handle:
             self.data_config = json.load(config_handle)
+        self.model_config = Provider.model_sample
         self.batch_size = config['batch_size']
         self.input_size = config["input_size"]
         self.output_size = config["output_size"]
         self.output_type = config["output_type"]
+        self.input_channel = config["input_channel"]
+        self.model_config["input_channel"] = self.input_channel
+        self.model_config["input_size"] = config["input_size"]
+        self.model_config["output_size"] = config["output_size"]
+        self.model_config["batch_size"] = self.batch_size
+        self.model_config["model_structure"] = config["model_structure"]
         print("finish parsing config")
 
     def get_trainable_data(self, data):
@@ -54,6 +73,10 @@ class Provider(object):
                 sub_y[sub_raw_y] = 1
                 y.append(sub_y)
             return x, np.array(y)
+
+
+    def get_config(self):
+        return self.model_config
 
 
     def _read_data(self):

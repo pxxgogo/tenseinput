@@ -69,7 +69,7 @@ def post_operate(emg_data_list):
     return final_data_list
 
 
-def data_process(emg_file_name, fft_flag, tag):
+def data_process(emg_file_name, fft_flag, tag, data_format):
     emg_raw_data_list = json.load(open(emg_file_name))
     emg_operated_data_list = []
     if tag > 0:
@@ -78,7 +78,10 @@ def data_process(emg_file_name, fft_flag, tag):
         emg_data_list = split_data(emg_raw_data_list)
     if fft_flag == 1:
         emg_data_list = fft_process(emg_data_list)
-    final_data_list = post_operate(emg_data_list)
+    if data_format == 1:
+        final_data_list = post_operate(emg_data_list)
+    else:
+        final_data_list = emg_data_list
     return np.array(final_data_list)
 
 def export(emg_operated_data, output_dir):
@@ -93,12 +96,14 @@ def main():
     parser.add_argument('emg', type=str)
     parser.add_argument('--fft', type=int, default=0)
     parser.add_argument('--output_dir', type=str, default="./emg_fft_data")
+    parser.add_argument('--data_format', type=int, default=0)
     args = parser.parse_args()
     tag = args.tag
     emg_file_name = args.emg
     fft_flag = args.fft
     output_dir = args.output_dir
-    emg_operated_data = data_process(emg_file_name, fft_flag, tag)
+    data_format = args.data_format
+    emg_operated_data = data_process(emg_file_name, fft_flag, tag, data_format)
     export(emg_operated_data, output_dir)
 
 main()

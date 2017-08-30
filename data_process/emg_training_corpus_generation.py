@@ -7,6 +7,7 @@ import re
 
 RELAX_NUM_PER_USER = 240
 RELAX_NUM_FREE_PER_USER = 240
+EXTRA_NUM_PER_USER = 0
 
 # if tag == 1:
 #     tense_x_list = []
@@ -59,7 +60,8 @@ def generate_data(tag, file_dir):
     else:
         for data in raw_data:
             data[1] = 0
-        return raw_data
+        np.random.shuffle(raw_data)
+        return raw_data[:EXTRA_NUM_PER_USER]
 
 
 def read_data(input_dir):

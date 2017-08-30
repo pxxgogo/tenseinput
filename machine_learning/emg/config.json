@@ -1,7 +1,41 @@
 {
-  "data_dir": "../../data/training_data/0828/emg",
-  "batch_size": 64,
-  "input_size": 180,
+  "data_dir": "../../data/training_data/0828/emg_channels_no_extra",
+  "batch_size": 16,
+  "input_size": 30,
   "output_size": 2,
-  "output_type": 1
+  "output_type": 1,
+  "input_channel": 6,
+  "model_structure":
+  [
+    {
+      "filter_size": [1, 2],
+      "out_channels": 32,
+      "pool_size":[1, 2]
+    },
+    {
+      "filter_size": [2, 2],
+      "out_channels": 32,
+      "pool_size":[1, 2]
+    },
+    {
+      "filter_size": [1, 2],
+      "out_channels": 32,
+      "pool_size":[1, 2]
+    },
+    {
+      "filter_size": [2, 2],
+      "out_channels": 16,
+      "pool_size":[1, 2]
+    },
+    {
+      "filter_size": [2, 2],
+      "out_channels": 16,
+      "pool_size":[1, 2]
+    },
+        {
+      "filter_size": [2, 2],
+      "out_channels": 16,
+      "pool_size":[1, 2]
+    }
+  ]
 }

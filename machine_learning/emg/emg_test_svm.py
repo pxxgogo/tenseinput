@@ -2,7 +2,7 @@ import numpy as np
 from sklearn import svm
 import argparse
 import os
-TRAINABLE_NUM = 1000
+TRAINABLE_NUM = 100000
 
 
 def generate_trainable_data(data_dir):

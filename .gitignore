@@ -4,10 +4,10 @@
 /data_collection/*.txt
 /data_collection/*.csv
 /env/**
-*/.idea/**
+**/.idea/**
 .idea/**
 /model/**
-*/__pycache__/**
+**/__pycache__/
 **.swap
 **.swp
 
