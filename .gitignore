@@ -2,13 +2,17 @@
 *.docx
 /data/**
 /data_collection/*.txt
+/data_collection/past/*
 /data_collection/*.csv
 /env/**
 **/.idea/**
 .idea/**
 /model/**
+/backup/**
 **/__pycache__/
 **.swap
 **.swp
-
+activate.bat
+record.bat
+myo/**
 
