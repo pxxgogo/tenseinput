@@ -7,7 +7,7 @@
 /env/**
 **/.idea/**
 .idea/**
-/model/**
+**/model/**
 /backup/**
 **/__pycache__/
 **.swap

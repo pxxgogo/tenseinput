@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 import argparse
 from datetime import datetime
+import json
 
 from provider import Provider
 
@@ -77,7 +78,7 @@ class Model(object):
         tvars = tf.trainable_variables()
         grads, _ = tf.clip_by_global_norm(tf.gradients(cost, tvars),
                                           config['max_grad_norm'])
-        optimizer = tf.train.GradientDescentOptimizer(self._lr)
+        optimizer = tf.train.AdamOptimizer(self._lr)
         self._train_op = optimizer.apply_gradients(zip(grads, tvars))
 
         self._new_lr = tf.placeholder(tf.float32, shape=[], name="new_learning_rate")
@@ -207,21 +208,33 @@ def main():
         for v in tf.global_variables():
             print(v.name)
         saver = tf.train.Saver()
+        best_cost = 10000
+        model_No = 0
+        best_precision = 0
+        with open("./model/model_config.json", 'w') as file_handle:
+            file_handle.write(json.dumps(config))
         for i in range(config['max_max_epoch']):
-            lr_decay = config['lr_decay'] ** max(i - config['max_epoch'], 0.0)
-            m.assign_lr(session, config['learning_rate'] * lr_decay)
+            # lr_decay = config['lr_decay'] ** max(i - config['max_epoch'], 0.0)
+            # m.assign_lr(session, config['learning_rate'] * lr_decay)
+            m.assign_lr(session, config['learning_rate'])
             print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
             print("Starting Time:", datetime.now())
             train_perplexity, precision, debug_val = run_epoch(session, m, provider, 'train', m.train_op, verbose=True)
-            print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
             print("Ending Time:", datetime.now())
-            save_path = saver.save(session, './model/misscut_rnn_model', global_step=i)
-            print("Model saved in file: %s" % save_path)
             print("Starting Time:", datetime.now())
             test_perplexity, precision, debug_val = run_epoch(session, mtest, provider, 'test', tf.no_op())
-            print("Test Perplexity: %.3f" % test_perplexity)
+            print("COST:", test_perplexity)
             print("Test Precision: %.3f (%.3f)" % (precision, debug_val))
+            if test_perplexity < best_cost:
+                best_precision = precision
+                best_cost = test_perplexity
+                save_path = saver.save(session, './model/model', global_step=model_No)
+                model_No += 1
+                print("SAVE!!!!")
+                print("Model saved in file: %s" % save_path)
+
             print("Ending Time:", datetime.now())
+        print("BEST PRECISION", best_precision)
 
 
 if __name__ == "__main__":

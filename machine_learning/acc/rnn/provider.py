@@ -6,38 +6,37 @@ import os
 import traceback
 import random
 
-INPUT_SIZE = 180
-OUTPUT_SIZE = 2
+INPUT_SIZE = 600
+NUM_STEPS = 5
+OUTPUT_SIZE = 3
 
 
 class Provider(object):
     model_sample = {
-        'init_scale': 0.1,
-        'learning_rate': 0.001,
-        'max_grad_norm': 5,
-        'max_epoch': 40,
-        'max_max_epoch': 40,
-        'keep_prob': 1.0,
-        'lr_decay': 0.1,
-        'batch_size': 16,
-        'input_channel': 1,
-        'input_size': INPUT_SIZE,
-        'output_size': OUTPUT_SIZE
-    }
+            'init_scale': 0.1,
+            'learning_rate': 0.001,
+            'max_grad_norm': 5,
+            'num_layers': 3,
+            'hidden_size': 300,
+            'max_epoch': 13,
+            'max_max_epoch': 39,
+            'keep_prob': 1.0,
+            'lr_decay': 0.5,
+            'batch_size': 16,
+            'input_size': INPUT_SIZE,
+            'num_steps': NUM_STEPS,
+            'output_size': OUTPUT_SIZE
+        }
     CORPUS_CONFIG_NAME = "corpus_config.json"
     FILENAMES = ["training_data.npy", "test_data.npy"]
 
     def __init__(self, config_dir):
         self.data_dir = ''
-        self.legal_model_size = ['s', 'm', 'l', 't']
         self.input_compat = raw_input if sys.version_info[0] < 3 else input
         self.data_dir = ''
         self.model = ''
         self.status = 'IDLE'
-
         self.batch_size = 1
-        self.yield_pos = [0, 0, 0]
-
         self._parse_config(config_dir)
         self._read_data()
 
@@ -52,14 +51,22 @@ class Provider(object):
         self.model_config["batch_size"] = self.batch_size = config['batch_size']
         self.model_config["input_size"] = self.input_size = config["input_size"]
         self.model_config["output_size"] = self.output_size = config["output_size"]
-        self.model_config["input_channel"] = self.input_channel = config["input_channel"]
-        self.model_config["model_structure"] = config["model_structure"]
         self.output_type = config["output_type"]
+
         print("finish parsing config")
+
+    def concatenate(self, data):
+        return
+
 
     def get_trainable_data(self, data):
         if self.output_type == 0:
-            return [np.array(list(data[:, 0])), np.array(list(data[:, 1]))]
+            x = []
+            y = []
+            for sub_data in data:
+                x.append(sub_data[0][-NUM_STEPS:])
+                y.append(sub_data[1])
+            return [np.array(x), np.array(y)]
         else:
             x = np.array(list(data[:, 0]))
             raw_y = data[:, 1]
@@ -68,16 +75,14 @@ class Provider(object):
                 sub_y = [0 for i in range(self.output_size)]
                 sub_y[sub_raw_y] = 1
                 y.append(sub_y)
-            return x, np.array(y)
-
-
-    def get_config(self):
-        return self.model_config
-
+            return x[:, -NUM_STEPS:], np.array(y)
 
     def _read_data(self):
         self.raw_training_data = np.load(op.join(self.data_dir, self.data_config["training_data"]))
         self.test_data = self.get_trainable_data(np.load(op.join(self.data_dir, self.data_config["test_data"])))
+
+    def get_config(self):
+        return self.model_config
 
     def get_epoch_size(self):
         if self.status == 'train':
@@ -112,6 +117,6 @@ if __name__ == "__main__":
     provide = Provider('./config.json')
     provide.status = 'train'
     for x, y in provide():
-        print("input", x.shape)
-        print("output", y.shape)
+        print("input", x)
+        print("output", y)
         input("Next")

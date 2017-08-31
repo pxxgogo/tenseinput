@@ -1,0 +1,25 @@
+{
+  "data_dir": "../../../data/training_data/0828/acc_sliding",
+  "sliding_flag": 1,
+  "batch_size": 16,
+  "input_size": 603,
+  "output_size": 2,
+  "output_type": 1,
+  "input_channel": 5,
+  "model_structure": [
+    {
+      "repeated_times": 3,
+      "filter_size": [
+        2,
+        10
+      ],
+      "out_channels": 32,
+      "pool_size": [
+        1,
+        10
+      ],
+      "filter_type": "SAME",
+      "pool_type": "VALID"
+    }
+  ]
+}

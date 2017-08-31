@@ -9,35 +9,6 @@ RELAX_NUM_PER_USER = 240
 RELAX_NUM_FREE_PER_USER = 240
 EXTRA_NUM_PER_USER = 0
 
-# if tag == 1:
-#     tense_x_list = []
-#     relax_x_list = []
-#     for data in raw_data:
-#         if data[1] == 1:
-#             tense_x_list.append(data[0])
-#         else:
-#             relax_x_list.append(data[0])
-#     random.shuffle(relax_x_list)
-#     relax_x_list = relax_x_list[:RELAX_NUM_PER_USER]
-#     tense_y_list = [1 for i in range(len(tense_x_list))]
-#     relax_y_list = [0 for i in range(len(relax_x_list))]
-#     tense_x_list.extend(relax_x_list)
-#     tense_y_list.extend(relax_y_list)
-#     return tense_x_list, tense_y_list
-# elif tag == 0:
-#     x_list = []
-#     for data in raw_data:
-#         x_list.append(data[0])
-#     random.shuffle(x_list)
-#     x_list = x_list[:RELAX_NUM_FREE_PER_USER]
-#     y_list = [0 for i in range(len(x_list))]
-#     return x_list, y_list
-# else:
-#     x_list = []
-#     for data in raw_data:
-#         x_list.append(data[0])
-#     y_list = [0 for i in range(len(x_list))]
-#     return x_list, y_list
 
 def generate_data(tag, file_dir):
     raw_data = np.load(file_dir)
@@ -94,6 +65,12 @@ def read_data(input_dir):
 def export(training_data, test_data, output_dir):
     np.save(os.path.join(output_dir, "training_data"), training_data)
     np.save(os.path.join(output_dir, "test_data"), test_data)
+    di = {}
+    di["training_data"] = "training_data.npy"
+    di["test_data"] = "test_data.npy"
+    config_handle = open(os.path.join(output_dir, "corpus_config.json"), 'w')
+    json.dump(di, config_handle)
+    config_handle.close()
 
 
 def main():

@@ -5,37 +5,84 @@
   "output_size": 2,
   "output_type": 1,
   "input_channel": 6,
-  "model_structure":
-  [
+  "model_structure": [
     {
-      "filter_size": [1, 2],
+      "filter_size": [
+        2,
+        2
+      ],
       "out_channels": 32,
-      "pool_size":[1, 2]
+      "pool_size": [
+        1,
+        2
+      ],
+      "filter_type": "SAME",
+      "pool_type": "SAME"
     },
     {
-      "filter_size": [2, 2],
+      "filter_size": [
+        3,
+        3
+      ],
       "out_channels": 32,
-      "pool_size":[1, 2]
+      "pool_size": [
+        1,
+        2
+      ],
+      "filter_type": "SAME",
+      "pool_type": "SAME"
     },
     {
-      "filter_size": [1, 2],
+      "filter_size": [
+        1,
+        2
+      ],
       "out_channels": 32,
-      "pool_size":[1, 2]
+      "pool_size": [
+        1,
+        2
+      ],
+      "filter_type": "SAME",
+      "pool_type": "SAME"
     },
     {
-      "filter_size": [2, 2],
+      "filter_size": [
+        2,
+        2
+      ],
       "out_channels": 16,
-      "pool_size":[1, 2]
+      "pool_size": [
+        1,
+        2
+      ],
+      "filter_type": "SAME",
+      "pool_type": "SAME"
     },
     {
-      "filter_size": [2, 2],
+      "filter_size": [
+        2,
+        2
+      ],
       "out_channels": 16,
-      "pool_size":[1, 2]
+      "pool_size": [
+        1,
+        2
+      ],
+      "filter_type": "SAME",
+      "pool_type": "SAME"
     },
-        {
-      "filter_size": [2, 2],
+    {
+      "filter_size": [
+        2,
+        2
+      ],
       "out_channels": 16,
-      "pool_size":[1, 2]
+      "pool_size": [
+        1,
+        2
+      ],
+      "filter_type": "SAME",
+      "pool_type": "SAME"
     }
   ]
 }

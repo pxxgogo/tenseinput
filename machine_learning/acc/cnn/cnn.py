@@ -38,18 +38,24 @@ class Model(object):
         self._input_data = tf.placeholder(data_type(), [self.batch_size, self.input_channel, self.input_size])
         self._targets = tf.placeholder(tf.int16, [self.batch_size, self.output_size])
         data = tf.reshape(self._input_data, [self.batch_size, self.input_channel, self.input_size, 1])
+        layer_No = 0
         for i, layer in enumerate(self.model_structure):
-            data = self.add_conv_layer(
-                No=i,
-                input=data,
-                filter_size=layer["filter_size"],
-                out_channels=layer["out_channels"],
-                filter_type=layer["filter_type"]
-            )
-            data = self.add_pool_layer(i, data, layer["pool_size"], [1, 1, 1, 1], pool_type=layer["pool_type"])
+            repeated_times = layer["repeated_times"]
+            while repeated_times > 0:
+                data = self.add_conv_layer(
+                    No=layer_No,
+                    input=data,
+                    filter_size=layer["filter_size"],
+                    out_channels=layer["out_channels"],
+                    filter_type=layer["filter_type"]
+                )
+                data = self.add_pool_layer(layer_No, data, layer["pool_size"], [1, 1, 1, 1], pool_type=layer["pool_type"])
+                repeated_times -= 1
+                layer_No += 1
+
 
         #
-        # print(data.shape)
+        print(data.shape)
         # exit()
 
         data = tf.reshape(data, [self.batch_size, -1])
