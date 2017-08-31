@@ -8,14 +8,13 @@ import random
 
 INPUT_SIZE = 180
 OUTPUT_SIZE = 2
-NUM_STEPS = 5
-
+PADDING = 2
 
 
 class Provider(object):
     model_sample = {
         'init_scale': 0.1,
-        'learning_rate': 0.001,
+        'learning_rate': 0.0001,
         'max_grad_norm': 5,
         'max_epoch': 40,
         'max_max_epoch': 40,
@@ -56,7 +55,7 @@ class Provider(object):
         self.model_config["output_size"] = self.output_size = config["output_size"]
         self.model_config["input_channel"] = self.input_channel = config["input_channel"]
         self.model_config["model_structure"] = config["model_structure"]
-        self.model_config["sliding_flag"] = self.sliding_flag = config["sliding_flag"]
+        self.model_config["sliding_flag"] = self.sliding_flag = config.get("sliding_flag", 0)
         self.output_type = config["output_type"]
         print("finish parsing config")
 
@@ -66,7 +65,7 @@ class Provider(object):
                 x = []
                 y = []
                 for sub_data in data:
-                    x.append(sub_data[0][-NUM_STEPS:])
+                    x.append(sub_data[0][PADDING: PADDING + self.input_channel])
                     y.append(sub_data[1])
                 return [np.array(x), np.array(y)]
             else:
@@ -77,7 +76,7 @@ class Provider(object):
                     sub_y = [0 for i in range(self.output_size)]
                     sub_y[sub_raw_y] = 1
                     y.append(sub_y)
-                return x[:, -NUM_STEPS:], np.array(y)
+                return x[:, PADDING: PADDING + self.input_channel], np.array(y)
         else:
             if self.output_type == 0:
                 return [np.array(list(data[:, 0])), np.array(list(data[:, 1]))]
@@ -91,10 +90,8 @@ class Provider(object):
                     y.append(sub_y)
                 return x, np.array(y)
 
-
     def get_config(self):
         return self.model_config
-
 
     def _read_data(self):
         self.raw_training_data = np.load(op.join(self.data_dir, self.data_config["training_data"]))

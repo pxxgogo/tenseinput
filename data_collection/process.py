@@ -20,7 +20,7 @@ def read_data(data, offset):
     return arr
 
 
-a = serial.Serial('/dev/ttyACM0', 115200)
+a = serial.Serial('/dev/ttyACM1', 115200)
 
 raw_datafile = open(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '-raw.csv', 'w')
 # datafile = open(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '.txt', 'w')

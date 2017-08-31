@@ -1,7 +1,0 @@
-{
-  "data_dir": "../../../data/training_data/0828/acc_sliding",
-  "batch_size": 16,
-  "input_size": 603,
-  "output_size": 2,
-  "output_type": 1
-}

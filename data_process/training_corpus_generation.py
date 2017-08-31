@@ -7,7 +7,7 @@ import re
 
 RELAX_NUM_PER_USER = 240
 RELAX_NUM_FREE_PER_USER = 240
-EXTRA_NUM_PER_USER = 0
+EXTRA_NUM_PER_USER = 240
 
 
 def generate_data(tag, file_dir):

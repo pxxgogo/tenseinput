@@ -6,7 +6,7 @@ import time
 from estimator import Estimator
 
 
-a = serial.Serial('/dev/ttyACM0', 115200)
+a = serial.Serial('/dev/ttyACM1', 115200)
 WINDOW_SIZE = 400
 SAMPLE_SIZE = 100
 
@@ -32,11 +32,11 @@ def plot(data):
     y_freq = abs(np.fft.rfft(np.array(data[1], dtype=np.float32)))
     z_freq = abs(np.fft.rfft(np.array(data[2], dtype=np.float32)))
     freqs = np.array([x_freq, y_freq, z_freq])
-    for i in range(3):
+    for i in range(1):
         # print(x[1:].shape, data[i][1:].shape)
         lines[i].set_xdata(x[1:])
         # lines[i].set_ydata(freqs[i][1:])
-        lines[i].set_ydata(abs(data[i][1:][:200]))
+        lines[i].set_ydata(abs(freqs[i][1:][:200]))
     # print(freqs[:, 50], end="\r")
     fig.canvas.draw()
     fig.canvas.flush_events()
@@ -84,7 +84,7 @@ def run():
         vp = est.feed_data(dt, raw_gyr, raw_acc)
         print(vp, end="\r")
         for i in range(3):
-            window_data[i][index] = vp[i]*4096
+            window_data[i][index] = vp[i]*1024
 
         index += 1
         sample_num += 1

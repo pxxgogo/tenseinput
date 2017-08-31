@@ -1,5 +1,5 @@
 {
-  "data_dir": "../../data/training_data/0828/emg_channels_no_extra",
+  "data_dir": "../data/training_data/0828/emg_channels",
   "batch_size": 16,
   "input_size": 30,
   "output_size": 2,
@@ -7,6 +7,8 @@
   "input_channel": 6,
   "model_structure": [
     {
+      "net_type": "CNN",
+      "repeated_times": 3,
       "filter_size": [
         2,
         2
@@ -16,73 +18,8 @@
         1,
         2
       ],
-      "filter_type": "SAME",
-      "pool_type": "SAME"
-    },
-    {
-      "filter_size": [
-        3,
-        3
-      ],
-      "out_channels": 32,
-      "pool_size": [
-        1,
-        2
-      ],
-      "filter_type": "SAME",
-      "pool_type": "SAME"
-    },
-    {
-      "filter_size": [
-        1,
-        2
-      ],
-      "out_channels": 32,
-      "pool_size": [
-        1,
-        2
-      ],
-      "filter_type": "SAME",
-      "pool_type": "SAME"
-    },
-    {
-      "filter_size": [
-        2,
-        2
-      ],
-      "out_channels": 16,
-      "pool_size": [
-        1,
-        2
-      ],
-      "filter_type": "SAME",
-      "pool_type": "SAME"
-    },
-    {
-      "filter_size": [
-        2,
-        2
-      ],
-      "out_channels": 16,
-      "pool_size": [
-        1,
-        2
-      ],
-      "filter_type": "SAME",
-      "pool_type": "SAME"
-    },
-    {
-      "filter_size": [
-        2,
-        2
-      ],
-      "out_channels": 16,
-      "pool_size": [
-        1,
-        2
-      ],
-      "filter_type": "SAME",
-      "pool_type": "SAME"
+      "filter_type": "VALID",
+      "pool_type": "VALID"
     }
   ]
 }

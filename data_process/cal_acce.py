@@ -3,6 +3,8 @@ import os
 
 from estimator import Estimator
 
+TIMES = 64
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('input_path', type=str)
@@ -28,7 +30,7 @@ if __name__ == "__main__":
             last_timestamp = timestamp
             continue
         acce_data = est.feed_data(timestamp - last_timestamp, gyro_data, acce_raw_data)
-        new_acce_data = acce_data * 4096
+        new_acce_data = acce_data * TIMES
         ts = round(timestamp * 1000)
         # new_acce_data = [float(x) for x in new_acce_data]
         # print(timestamp - last_timestamp, acce_data, new_acce_data)

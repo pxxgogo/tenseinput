@@ -17,7 +17,7 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 FLAGS = flags.FLAGS
-SAMPLE_NUM = 1
+SAMPLE_NUM = 2
 DEVICES = "/cpu:0"
 
 
@@ -29,42 +29,103 @@ class Model(object):
     """The RNN model."""
 
     def __init__(self, config):
-        self.hidden_size = config['hidden_size']
-        self.input_size = config['input_size']
-        self.num_steps = config['num_steps']
-        self.output_size = config['output_size']
         self.batch_size = 1
+        self.input_size = config['input_size']
+        self.output_size = config['output_size']
+        self.input_channel = config['input_channel']
+        self.model_structure = config['model_structure']
 
-        self._input_data = tf.placeholder(data_type(), [self.batch_size, self.num_steps, self.input_size])
+        self._input_data = tf.placeholder(data_type(), [self.batch_size, self.input_channel, self.input_size])
+        self._targets = tf.placeholder(tf.int16, [self.batch_size, self.output_size])
+        data = self._input_data
+        layer_No = 0
+        for i, layer in enumerate(self.model_structure):
+            net_type = layer["net_type"]
+            repeated_times = layer.get("repeated_times", 1)
+            while repeated_times > 0:
+                if net_type == "LSTM":
+                    data = self.add_lstm_layer(
+                        No=layer_No,
+                        input=data,
+                        hidden_size=layer["hidden_size"]
+                    )
+                elif net_type == "RESNET":
+                    data = self.add_renet_layer(data, self._input_data)
+                elif net_type == "CNN":
+                    # print(data.shape)
+                    # print(repeated_times)
+                    if len(data.shape) == 3:
+                        data = tf.reshape(data, [self.batch_size, self.input_channel, -1, 1])
 
-        with tf.device(DEVICES):
-            lstm_cell_list = []
-            for i in range(config['num_layers']):
-                lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size, forget_bias=0.0, state_is_tuple=True,
-                                                         reuse=tf.get_variable_scope().reuse)
-                lstm_cell_list.append(lstm_cell)
-            cell = tf.contrib.rnn.MultiRNNCell(lstm_cell_list, state_is_tuple=True)
-        inputs = self._input_data
-        # self._initial_state = cell.zero_state(self.batch_size, data_type())
-        with tf.variable_scope("RNN"):
-            outputs, last_states = tf.nn.dynamic_rnn(
-                cell=cell,
-                dtype=data_type(),
-                inputs=inputs)
-        # print(outputs.shape)
-        self.debug_val = outputs
-        self.output = output = outputs[:, -1, :]
-        print(output.shape)
+                    data = self.add_conv_layer(
+                        No=layer_No,
+                        input=data,
+                        filter_size=layer["filter_size"],
+                        out_channels=layer["out_channels"],
+                        filter_type=layer["filter_type"]
+                    )
+                    data = self.add_pool_layer(layer_No, data, layer["pool_size"], [1, 1, 1, 1],
+                                               pool_type=layer["pool_type"])
+                repeated_times -= 1
+                layer_No += 1
+        #
+        print(data.shape)
+        # exit()
+
+        data = tf.reshape(data, [self.batch_size, -1])
+
         softmax_w = tf.get_variable(
-            "softmax_w", [self.hidden_size, self.output_size], dtype=data_type())
+            "softmax_w", [data.shape[1], self.output_size], dtype=data_type())
         softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
-        self.logits = tf.matmul(output, softmax_w) + softmax_b
-        self._predict_op = tf.argmax(self.logits, 1)
+        self.logits = logits = tf.matmul(data, softmax_w) + softmax_b
+        # print(self.logits.shape)
+        self._cost = cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits))
+        self._predict_op = tf.argmax(logits, 1)
+
+    def add_lstm_layer(self, No, input, hidden_size):
+        lstm_cell = tf.contrib.rnn.BasicLSTMCell(hidden_size, forget_bias=0.0, state_is_tuple=True,
+                                                 reuse=tf.get_variable_scope().reuse)
+        with tf.variable_scope("lstm_layer_%d" % No):
+            outputs, last_states = tf.nn.dynamic_rnn(
+                cell=lstm_cell,
+                dtype=data_type(),
+                inputs=input)
+        return tf.convert_to_tensor(outputs)
+
+    def add_conv_layer(self, No, input, filter_size, out_channels, filter_type):
+        with tf.variable_scope("conv_layer_%d" % No):
+            W = tf.get_variable('filter', [filter_size[0], filter_size[1], input.shape[3], out_channels])
+            b = tf.get_variable('bias', [out_channels])
+            conv = tf.nn.conv2d(
+                input,
+                W,
+                strides=[1, 1, 1, 1],
+                padding=filter_type,
+                name='conv'
+            )
+            h = tf.nn.relu(tf.nn.bias_add(conv, b), name='relu')
+        return h
+
+    def add_pool_layer(self, No, input, pool_size, strides, pool_type):
+        for i in range(2):
+            if pool_size[i] == -1:
+                pool_size[i] = input.shape[1 + i]
+        with tf.variable_scope("pool_layer_%d" % No):
+            pooled = tf.nn.max_pool(
+                input,
+                ksize=[1, pool_size[0], pool_size[1], 1],
+                padding=pool_type,
+                strides=strides,
+                name='pool'
+            )
+        return pooled
+
+    def add_renet_layer(self, data, input):
+        return data + input
 
     @property
     def input_data(self):
         return self._input_data
-
 
     # @property
     # def final_state(self):
@@ -90,12 +151,12 @@ class Acce_operation(object):
             model_dir))
         for v in tf.global_variables():
             print(v.name)
-        self.num_steps = self.config["num_steps"]
-        # print(self.num_steps)
-        self.data = np.zeros([1, self.num_steps, self.config["input_size"]])
+        self.input_channel = self.config["input_channel"]
+        # print(self.input_channel)
+        self.data = np.zeros([1, self.input_channel, self.config["input_size"]])
         self.index = 0
         self.sample_index = 0
-        self.debug_index_list = np.zeros([1, self.num_steps])
+        self.debug_index_list = np.zeros([1, self.input_channel])
         self.debug_index = 0
 
     def operate_data(self, data):
@@ -105,14 +166,14 @@ class Acce_operation(object):
         return op_data
 
     def clean(self):
-        self.data = np.zeros([1, self.num_steps, self.config["input_size"]])
+        self.data = np.zeros([1, self.input_channel, self.config["input_size"]])
         self.index = 0
         self.sample_index = 0
-        self.debug_index_list = np.zeros([1, self.num_steps])
+        self.debug_index_list = np.zeros([1, self.input_channel])
         self.debug_index = 0
 
     def clean_partly(self):
-        self.debug_index_list = np.zeros([1, self.num_steps])
+        self.debug_index_list = np.zeros([1, self.input_channel])
         self.debug_index = 0
 
     def feed_data(self, data):
@@ -122,13 +183,14 @@ class Acce_operation(object):
         self.sample_index += 1
         self.index += 1
         self.debug_index += 1
-        if self.index == self.num_steps:
+        if self.index == self.input_channel:
             self.index = 0
         if self.sample_index == SAMPLE_NUM:
             self.sample_index = 0
             # print(self.data[0, 0, 0:50])
             window_data = np.concatenate([self.data[:, self.index:], self.data[:, :self.index]], axis=1)
-            debug_index_list = np.concatenate([self.debug_index_list[:, self.index:], self.debug_index_list[:, :self.index]], axis=1)
+            debug_index_list = np.concatenate(
+                [self.debug_index_list[:, self.index:], self.debug_index_list[:, :self.index]], axis=1)
             # print(window_data[0])
             # print(debug_index_list)
             return self.rnn_classify(window_data)
@@ -136,12 +198,10 @@ class Acce_operation(object):
             return -1, -1
 
     def rnn_classify(self, data):
-        fetches = [self.model.predict_op, self.model.logits, self.model.debug_val]
+        fetches = [self.model.predict_op, self.model.logits]
         feed_dict = {}
         feed_dict[self.model.input_data] = data
-        predict_val, logits, debug_val = self.session.run(fetches, feed_dict)
-        # print(data[0, 0, 0:50])
-        # print(debug_val[0, 0, 0:10])
+        predict_val, logits = self.session.run(fetches, feed_dict)
         return predict_val[0], logits
 
 # if __name__ == "__main__":

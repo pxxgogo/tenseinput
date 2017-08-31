@@ -11,13 +11,13 @@ import matplotlib.patches as mpatches
 import matplotlib.colors as colors
 
 fig = plt.figure()
-fig.patches.append(mpatches.Circle([0.5, 0.5], 0.25, transform=fig.transFigure))
+fig.patches.append(mpatches.Circle([0.5, 0.5], 0.1, transform=fig.transFigure))
 
 debug_No = 0
-a = serial.Serial('/dev/ttyACM0', 115200)
+a = serial.Serial('/dev/ttyACM1', 115200)
 WINDOW_SIZE = 400
 SAMPLE_SIZE = 100
-result_window = np.zeros(5)
+result_window = np.zeros(1)
 result_pointer = 0
 
 def update_result_window(ret):

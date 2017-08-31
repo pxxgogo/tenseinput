@@ -1,0 +1,41 @@
+{
+  "data_dir": "../../../data/training_data/0828/acc_sliding",
+  "sliding_flag": 1,
+  "batch_size": 16,
+  "input_size": 603,
+  "output_size": 2,
+  "output_type": 1,
+  "input_channel": 5,
+  "model_structure": [
+    {
+      "net_type": "LSTM",
+      "repeated_times": 2,
+      "hidden_size": 300
+    },
+    {
+      "net_type": "LSTM",
+      "repeated_times": 1,
+      "hidden_size": 128
+    },
+    {
+      "net_type": "LSTM",
+      "repeated_times": 1,
+      "hidden_size": 32
+    },
+    {
+      "net_type": "CNN",
+      "repeated_times": 3,
+      "filter_size": [
+        2,
+        5
+      ],
+      "out_channels": 32,
+      "pool_size": [
+        1,
+        3
+      ],
+      "filter_type": "VALID",
+      "pool_type": "VALID"
+    }
+  ]
+}
