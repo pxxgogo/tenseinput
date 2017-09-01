@@ -7,7 +7,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('data_input_dir', type=str)
 parser.add_argument('output_dir', type=str)
-parser.add_argument('--fft_type', type=str, default='0')
+parser.add_argument('--fft_type', type=str, default='1')
 parser.add_argument('--data_format', type=str, default='0')
 
 args = parser.parse_args()

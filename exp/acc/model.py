@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
-import time
-import os
-import json
-
 import numpy as np
 import tensorflow as tf
+import argparse
+from datetime import datetime
+import json
 
 flags = tf.flags
 logging = tf.logging
@@ -13,8 +11,7 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 FLAGS = flags.FLAGS
-INTERVAL_TIME = 8
-
+DEVICES = "/cpu:0"
 
 def data_type():
     return tf.float16 if FLAGS.use_fp16 else tf.float32
@@ -23,8 +20,8 @@ def data_type():
 class Model(object):
     """The RNN model."""
 
-    def __init__(self, is_training, config):
-        self.batch_size = config['batch_size']
+    def __init__(self, config):
+        self.batch_size = 1
         self.input_size = config['input_size']
         self.output_size = config['output_size']
         self.input_channel = config['input_channel']
@@ -59,10 +56,7 @@ class Model(object):
                     data = self.add_pool_layer(layer_No, data, layer["pool_size"], [1, 1, 1, 1],
                                                pool_type=layer["pool_type"])
                 elif net_type == "DENSE":
-                    if is_training:
-                        keep_prob = layer.get("keep_prob", 1.0)
-                    else:
-                        keep_prob = 1.0
+                    keep_prob = 1.0
                     data = self.add_dense_layer(
                         No=layer_No,
                         input=data,
@@ -85,18 +79,6 @@ class Model(object):
         self._cost = cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits))
         self._predict_op = tf.argmax(logits, 1)
 
-        if not is_training:
-            return
-
-        self._lr = tf.Variable(0.0, trainable=False)
-        tvars = tf.trainable_variables()
-        grads, _ = tf.clip_by_global_norm(tf.gradients(cost, tvars),
-                                          config['max_grad_norm'])
-        optimizer = tf.train.AdamOptimizer(self._lr)
-        self._train_op = optimizer.apply_gradients(zip(grads, tvars))
-
-        self._new_lr = tf.placeholder(tf.float32, shape=[], name="new_learning_rate")
-        self._lr_update = tf.assign(self._lr, self._new_lr)
 
     def add_lstm_layer(self, No, input, hidden_size):
         lstm_cell = tf.contrib.rnn.BasicLSTMCell(hidden_size, forget_bias=0.0, state_is_tuple=True,
@@ -160,62 +142,10 @@ class Model(object):
     def input_data(self):
         return self._input_data
 
-    @property
-    def targets(self):
-        return self._targets
-
     # @property
-    # def initial_state(self):
-    #     return self._initial_state
-
-    @property
-    def cost(self):
-        return self._cost
+    # def final_state(self):
+    #     return self._final_state
 
     @property
     def predict_op(self):
         return self._predict_op
-
-
-class Emg_operation(object):
-    def __init__(self, model_dir):
-        config_dir = os.path.join(model_dir, "model_config.json")
-        self.config = json.load(open(config_dir))
-        self.config["batch_size"] = 1
-        session_config = tf.ConfigProto(log_device_placement=False)
-        session_config.gpu_options.allow_growth = False
-        self.session = tf.Session(config=session_config)
-        with tf.variable_scope("model", reuse=None):
-            self.model = Model(config=self.config)
-        self.session.run(tf.global_variables_initializer())
-        new_saver = tf.train.Saver()
-        new_saver.restore(self.session, tf.train.latest_checkpoint(
-            model_dir))
-        for v in tf.global_variables():
-            print(v.name)
-        self.data_index = 0
-        self.sample_index = 0
-        self.data = np.zeros([self.config["input_channel"], self.config["input_size"]])
-
-    def predict(self):
-        fetches = [self.model.predict_op, self.model.logits]
-        feed_dict = {}
-        data =  np.concatenate([self.data[:, self.data_index:], self.data[:, :self.data_index]], axis=1)
-        feed_dict[self.model.input_data] = np.reshape(data, [1, self.data.shape[0], self.data.shape[1]])
-        predict_val, logits = self.session.run(fetches, feed_dict)
-        # print(predict_val, logits)
-        return predict_val[0], logits
-
-
-    def feed_data(self, data):
-        self.data[:, self.data_index] = np.array(data)
-        self.data_index += 1
-        self.sample_index += 1
-        if self.data_index >= self.config["input_size"]:
-            self.data_index = 0
-        if self.sample_index == INTERVAL_TIME:
-            ret, logits = self.predict()
-            self.sample_index = 0
-            return ret, logits
-        else:
-            return -1, []

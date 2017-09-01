@@ -1,0 +1,39 @@
+{
+  "data_dir": "../data/training_data/0828/acc_channels_static_2x",
+  "sliding_flag": 0,
+  "batch_size": 16,
+  "input_size": 151,
+  "output_size": 2,
+  "output_type": 1,
+  "input_channel": 3,
+  "learning_rate": 0.0001,
+  "model_structure": [
+    {
+      "net_type": "CNN",
+      "repeated_times": 4,
+      "filter_size": [
+        2,
+        4
+      ],
+      "out_channels": 64,
+      "pool_size": [
+        1,
+        3
+      ],
+      "filter_type": "SAME",
+      "pool_type": "VALID"
+    },
+    {
+      "net_type": "DENSE",
+      "repeated_times": 1,
+      "output_size": 256,
+      "keep_prob": 0.5
+    },
+    {
+      "net_type": "DENSE",
+      "repeated_times": 1,
+      "output_size": 64,
+      "keep_prob": 0.5
+    }
+  ]
+}

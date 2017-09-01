@@ -8,6 +8,7 @@
 **/.idea/**
 .idea/**
 **/model/**
+**/key_model/**
 /backup/**
 **/__pycache__/
 **.swap

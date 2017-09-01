@@ -4,11 +4,12 @@ import json
 import numpy as np
 import random
 
-WINDOW_SIZE = 400
+WINDOW_SIZE = 600
 SAMPLE_SIZE = 100
 SPLIT_WINDOW_SIZE = 10
 PADDING_FRAME = 0
 PADDING_TIME = 200
+PRUNE_SAMPLE_TIMES = 1
 
 
 def fft(window_data):
@@ -92,13 +93,14 @@ def prune_data(acc_data, window_size, padding_time=0, flag=0):
         new_acc_data = []
         for sub_data in acc_data:
             tag = sub_data[1]
-            acc_pruned_data = []
             if len(sub_data[0][0]) < window_size:
                 continue
-            for i in range(3):
-                x = sub_data[0][i][padding_time:window_size + padding_time]
-                acc_pruned_data.append(x)
-            new_acc_data.append([np.array(acc_pruned_data), tag])
+            for t in range(PRUNE_SAMPLE_TIMES):
+                acc_pruned_data = []
+                for i in range(3):
+                    x = sub_data[0][i][padding_time + t * window_size: padding_time + (t + 1) * window_size]
+                    acc_pruned_data.append(x)
+                new_acc_data.append([np.array(acc_pruned_data), tag])
     random.shuffle(new_acc_data)
     return new_acc_data
 
@@ -166,6 +168,12 @@ def export(acc_fft_data, output_dir):
     np.save(output_dir, acc_fft_data)
     # acc_fft_data.(output_dir, " ")
 
+# fft_type:
+#  0: sliding
+#  1: static
+# data_format
+#  0: channels
+#  1: joint
 
 def main():
     parser = argparse.ArgumentParser()

@@ -40,6 +40,8 @@ def reader_acc_emg(acc_emg_file_name, key_timestamps, tense_tag, file_type):
                 acc_emg_data_per_gesture = [[], [], []]
                 for data_str in acc_emg_raw_data_list:
                     acc_emg_raw_data = [float(x) for x in data_str.split()]
+                    while acc_emg_raw_data[0] >= key_timestamps[key_No][1] and not choose_flag:
+                        key_No += 1
                     if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1]:
                         acc_emg_data_list.append([acc_emg_data_per_gesture, key_timestamps[key_No][2]])
                         acc_emg_data_per_gesture = [[], [], []]
@@ -61,6 +63,8 @@ def reader_acc_emg(acc_emg_file_name, key_timestamps, tense_tag, file_type):
                 acc_emg_data_per_gesture = [[], [], []]
                 for data_str in acc_emg_raw_data_list:
                     acc_emg_raw_data = [float(x) for x in data_str.split()]
+                    while acc_emg_raw_data[0] >= key_timestamps[key_No][1] and not choose_flag:
+                        key_No += 1
                     if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1]:
                         acc_emg_data_list.append([acc_emg_data_per_gesture, tense_tag])
                         acc_emg_data_per_gesture = [[], [], []]
@@ -93,6 +97,8 @@ def reader_acc_emg(acc_emg_file_name, key_timestamps, tense_tag, file_type):
                 acc_emg_data_per_gesture = [[], [], [], [], [], []]
                 for data_str in acc_emg_raw_data_list:
                     acc_emg_raw_data = [int(x) for x in data_str.split()]
+                    while acc_emg_raw_data[0] >= key_timestamps[key_No][1] and not choose_flag:
+                        key_No += 1
                     if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1]:
                         acc_emg_data_list.append([acc_emg_data_per_gesture, key_timestamps[key_No][2]])
                         acc_emg_data_per_gesture = [[], [], [], [], [], []]
@@ -117,6 +123,8 @@ def reader_acc_emg(acc_emg_file_name, key_timestamps, tense_tag, file_type):
                 acc_emg_data_per_gesture = [[], [], [], [], [], []]
                 for data_str in acc_emg_raw_data_list:
                     acc_emg_raw_data = [int(x) for x in data_str.split()]
+                    while acc_emg_raw_data[0] >= key_timestamps[key_No][1] and not choose_flag:
+                        key_No += 1
                     if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1]:
                         acc_emg_data_list.append([acc_emg_data_per_gesture, tense_tag])
                         acc_emg_data_per_gesture = [[], [], [], [], [], []]

@@ -14,10 +14,8 @@ PADDING = 2
 class Provider(object):
     model_sample = {
         'init_scale': 0.1,
-        'learning_rate': 0.0001,
         'max_grad_norm': 5,
-        'max_epoch': 40,
-        'max_max_epoch': 40,
+        'max_epoch': 600,
         'keep_prob': 1.0,
         'lr_decay': 0.1,
         'batch_size': 16,
@@ -55,6 +53,7 @@ class Provider(object):
         self.model_config["output_size"] = self.output_size = config["output_size"]
         self.model_config["input_channel"] = self.input_channel = config["input_channel"]
         self.model_config["model_structure"] = config["model_structure"]
+        self.model_config["learning_rate"] = config["learning_rate"]
         self.model_config["sliding_flag"] = self.sliding_flag = config.get("sliding_flag", 0)
         self.output_type = config["output_type"]
         print("finish parsing config")

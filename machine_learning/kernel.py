@@ -34,6 +34,7 @@ class Model(object):
         self.output_size = config['output_size']
         self.input_channel = config['input_channel']
         self.model_structure = config['model_structure']
+        self.regularized_lambda = config.get("regularized_lambda", 0.5)
 
         self._input_data = tf.placeholder(data_type(), [self.batch_size, self.input_channel, self.input_size])
         self._targets = tf.placeholder(tf.int16, [self.batch_size, self.output_size])
@@ -52,11 +53,8 @@ class Model(object):
                 elif net_type == "RESNET":
                     data = self.add_renet_layer(data, self._input_data)
                 elif net_type == "CNN":
-                    # print(data.shape)
-                    # print(repeated_times)
                     if len(data.shape) == 3:
                         data = tf.reshape(data, [self.batch_size, self.input_channel, -1, 1])
-
                     data = self.add_conv_layer(
                         No=layer_No,
                         input=data,
@@ -66,6 +64,17 @@ class Model(object):
                     )
                     data = self.add_pool_layer(layer_No, data, layer["pool_size"], [1, 1, 1, 1],
                                                pool_type=layer["pool_type"])
+                elif net_type == "DENSE":
+                    if is_training:
+                        keep_prob = layer.get("keep_prob", 1.0)
+                    else:
+                        keep_prob = 1.0
+                    data = self.add_dense_layer(
+                        No=layer_No,
+                        input=data,
+                        output_size=layer["output_size"],
+                        keep_prob=keep_prob
+                    )
                 repeated_times -= 1
                 layer_No += 1
         #
@@ -79,7 +88,13 @@ class Model(object):
         softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
         self.logits = logits = tf.matmul(data, softmax_w) + softmax_b
         # print(self.logits.shape)
-        self._cost = cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits))
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits))
+        if is_training and self.regularized_lambda > 0:
+            tf.add_to_collection("losses", loss)
+            self._cost = cost = tf.add_n(tf.get_collection("losses"))
+        else:
+            self._cost = cost = loss
+
         self._predict_op = tf.argmax(logits, 1)
 
         if not is_training:
@@ -108,6 +123,7 @@ class Model(object):
     def add_conv_layer(self, No, input, filter_size, out_channels, filter_type):
         with tf.variable_scope("conv_layer_%d" % No):
             W = tf.get_variable('filter', [filter_size[0], filter_size[1], input.shape[3], out_channels])
+            tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
             b = tf.get_variable('bias', [out_channels])
             conv = tf.nn.conv2d(
                 input,
@@ -132,6 +148,24 @@ class Model(object):
                 name='pool'
             )
         return pooled
+
+    def get_length(self, input):
+        ret = 1
+        for i in range(1, len(input.shape)):
+            ret *= int(input.shape[i])
+        return ret
+
+    def add_dense_layer(self, No, input, output_size, keep_prob):
+        with tf.variable_scope("dense_layer_%d" % No):
+            input_length = self.get_length(input)
+            W = tf.get_variable('dense', [input_length, output_size])
+            tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
+            b = tf.get_variable('bias', [output_size])
+            data = tf.reshape(input, [-1, int(input_length)])
+            data = tf.nn.relu(tf.matmul(data, W) + b)
+            if keep_prob < 1.0:
+                data = tf.nn.dropout(data, keep_prob)
+        return data
 
     def add_renet_layer(self, data, input):
         return data + input
@@ -206,7 +240,7 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
         feed_dict[model.input_data] = x
         feed_dict[model.targets] = y
         if status == 'test':
-            cost, predict_val, _, logits = session.run(fetches, feed_dict)
+           cost, predict_val, _, logits = session.run(fetches, feed_dict)
             # print(y, logits)
         else:
             cost, predict_val, _ = session.run(fetches, feed_dict)
@@ -269,7 +303,7 @@ def main():
         with open("./model/model_config.json", 'w') as file_handle:
             file_handle.write(json.dumps(config))
         log = open("./model/training_log.txt", 'w')
-        for i in range(config['max_max_epoch']):
+        for i in range(config['max_epoch']):
             # lr_decay = config['lr_decay'] ** max(i - config['max_epoch'], 0.0)
             # m.assign_lr(session, config['learning_rate'] * lr_decay)
             m.assign_lr(session, config['learning_rate'])

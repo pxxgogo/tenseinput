@@ -1,0 +1,33 @@
+{
+  "data_dir": "../data/training_data/0901/acc",
+  "sliding_flag": 0,
+  "batch_size": 16,
+  "input_size": 301,
+  "output_size": 2,
+  "output_type": 1,
+  "input_channel": 3,
+  "learning_rate": 0.0001,
+  "model_structure": [
+    {
+      "net_type": "CNN",
+      "repeated_times": 3,
+      "filter_size": [
+        2,
+        10
+      ],
+      "out_channels": 16,
+      "pool_size": [
+        1,
+        10
+      ],
+      "filter_type": "SAME",
+      "pool_type": "VALID"
+    },
+    {
+      "net_type": "DENSE",
+      "repeated_times": 1,
+      "output_size": 128,
+      "keep_prob": 0.5
+    }
+  ]
+}
