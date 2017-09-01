@@ -5,8 +5,8 @@
   "output_size": 2,
   "output_type": 1,
   "input_channel": 6,
-  "learning_rate": 0.0001,
-  "regularized_lambda": 0,
+  "learning_rate": 0.001,
+  "regularized_lambda": 0.0000001,
   "model_structure": [
     {
       "net_type": "CNN",

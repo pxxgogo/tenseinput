@@ -10,7 +10,7 @@ import tensorflow as tf
 import argparse
 from datetime import datetime
 
-from provider import Provider
+from mix_provider import Provider
 
 flags = tf.flags
 logging = tf.logging
@@ -33,56 +33,134 @@ class Model(object):
         self.input_size = config['input_size']
         self.output_size = config['output_size']
         self.input_channel = config['input_channel']
-        self.model_structure = config['model_structure']
+        self.acc_model_structure = config['acc_model_structure']
+        self.emg_model_structure = config['emg_model_structure']
         self.regularized_lambda = config.get("regularized_lambda", 0.5)
+        self.model_type = config.get('model_type', 0)
 
-        self._input_data = tf.placeholder(data_type(), [self.batch_size, self.input_channel, self.input_size])
+        self._acc_input_data = tf.placeholder(data_type(), [self.batch_size, self.input_channel[0], self.input_size[0]])
+        self._emg_input_data = tf.placeholder(data_type(), [self.batch_size, self.input_channel[1], self.input_size[1]])
         self._targets = tf.placeholder(tf.int16, [self.batch_size, self.output_size])
-        data = self._input_data
+        acc_data = self._acc_input_data
         layer_No = 0
-        for i, layer in enumerate(self.model_structure):
+        for i, layer in enumerate(self.acc_model_structure):
             net_type = layer["net_type"]
             repeated_times = layer.get("repeated_times", 1)
             while repeated_times > 0:
                 if net_type == "LSTM":
-                    data = self.add_lstm_layer(
+                    acc_data = self.add_lstm_layer(
+                        type='acc',
                         No=layer_No,
-                        input=data,
+                        input=acc_data,
                         hidden_size=layer["hidden_size"]
                     )
                 elif net_type == "RESNET":
-                    data = self.add_renet_layer(data, self._input_data)
+                    data = self.add_resnet_layer(
+                        data=acc_data,
+                        input=self._acc_input_data)
                 elif net_type == "CNN":
-                    if len(data.shape) == 3:
-                        data = tf.reshape(data, [self.batch_size, self.input_channel, -1, 1])
-                    data = self.add_conv_layer(
+                    if len(acc_data.shape) == 3:
+                        acc_data = tf.reshape(acc_data, [self.batch_size, self.input_channel[0], -1, 1])
+                    acc_data = self.add_conv_layer(
+                        type='acc',
                         No=layer_No,
-                        input=data,
+                        input=acc_data,
                         filter_size=layer["filter_size"],
                         out_channels=layer["out_channels"],
                         filter_type=layer["filter_type"]
                     )
-                    data = self.add_pool_layer(layer_No, data, layer["pool_size"], [1, 1, 1, 1],
-                                               pool_type=layer["pool_type"])
+                    acc_data = self.add_pool_layer(
+                        type='acc',
+                        No=layer_No,
+                        input=acc_data,
+                        pool_size=layer["pool_size"],
+                        strides=[1, 1, 1, 1],
+                        pool_type=layer["pool_type"]
+                    )
                 elif net_type == "DENSE":
                     if is_training:
                         keep_prob = layer.get("keep_prob", 1.0)
                     else:
                         keep_prob = 1.0
-                    data = self.add_dense_layer(
+                    acc_data = self.add_dense_layer(
+                        type='acc',
                         No=layer_No,
-                        input=data,
+                        input=acc_data,
                         output_size=layer["output_size"],
                         keep_prob=keep_prob
                     )
                 repeated_times -= 1
                 layer_No += 1
         #
-        print(data.shape)
+        print(acc_data.shape)
         # exit()
 
-        data = tf.reshape(data, [self.batch_size, -1])
+        acc_data = tf.reshape(acc_data, [self.batch_size, -1])
 
+        emg_data = self._emg_input_data
+        layer_No = 0
+        for i, layer in enumerate(self.emg_model_structure):
+            net_type = layer["net_type"]
+            repeated_times = layer.get("repeated_times", 1)
+            while repeated_times > 0:
+                if net_type == "LSTM":
+                    emg_data = self.add_lstm_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        hidden_size=layer["hidden_size"]
+                    )
+                elif net_type == "RESNET":
+                    data = self.add_resnet_layer(
+                        data=emg_data,
+                        input=self._emg_input_data)
+                elif net_type == "CNN":
+                    if len(emg_data.shape) == 3:
+                        emg_data = tf.reshape(emg_data, [self.batch_size, self.input_channel[1], -1, 1])
+                    emg_data = self.add_conv_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        filter_size=layer["filter_size"],
+                        out_channels=layer["out_channels"],
+                        filter_type=layer["filter_type"],
+                        r_flag=False
+                    )
+                    emg_data = self.add_pool_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        pool_size=layer["pool_size"],
+                        strides=[1, 1, 1, 1],
+                        pool_type=layer["pool_type"]
+                    )
+                elif net_type == "DENSE":
+                    if is_training:
+                        keep_prob = layer.get("keep_prob", 1.0)
+                    else:
+                        keep_prob = 1.0
+                    emg_data = self.add_dense_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        output_size=layer["output_size"],
+                        keep_prob=keep_prob,
+                        r_flag=False
+                    )
+                repeated_times -= 1
+                layer_No += 1
+        #
+        print(emg_data.shape)
+        # exit()
+
+        emg_data = tf.reshape(emg_data, [self.batch_size, -1])
+
+        if self.model_type == 0:
+            data = tf.concat([acc_data, emg_data], axis=1)
+        elif self.model_type == 1:
+            data = acc_data
+        else:
+            data = emg_data
         softmax_w = tf.get_variable(
             "softmax_w", [data.shape[1], self.output_size], dtype=data_type())
         softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
@@ -110,20 +188,21 @@ class Model(object):
         self._new_lr = tf.placeholder(tf.float32, shape=[], name="new_learning_rate")
         self._lr_update = tf.assign(self._lr, self._new_lr)
 
-    def add_lstm_layer(self, No, input, hidden_size):
+    def add_lstm_layer(self, type, No, input, hidden_size):
         lstm_cell = tf.contrib.rnn.BasicLSTMCell(hidden_size, forget_bias=0.0, state_is_tuple=True,
                                                  reuse=tf.get_variable_scope().reuse)
-        with tf.variable_scope("lstm_layer_%d" % No):
+        with tf.variable_scope("lstm_layer_%s_%d" % (type, No)):
             outputs, last_states = tf.nn.dynamic_rnn(
                 cell=lstm_cell,
                 dtype=data_type(),
                 inputs=input)
         return tf.convert_to_tensor(outputs)
 
-    def add_conv_layer(self, No, input, filter_size, out_channels, filter_type):
-        with tf.variable_scope("conv_layer_%d" % No):
+    def add_conv_layer(self, type, No, input, filter_size, out_channels, filter_type, r_flag=True):
+        with tf.variable_scope("conv_layer_%s_%d" % (type, No)):
             W = tf.get_variable('filter', [filter_size[0], filter_size[1], input.shape[3], out_channels])
-            tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
+            if r_flag:
+                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
             b = tf.get_variable('bias', [out_channels])
             conv = tf.nn.conv2d(
                 input,
@@ -135,11 +214,11 @@ class Model(object):
             h = tf.nn.relu(tf.nn.bias_add(conv, b), name='relu')
         return h
 
-    def add_pool_layer(self, No, input, pool_size, strides, pool_type):
+    def add_pool_layer(self, type, No, input, pool_size, strides, pool_type):
         for i in range(2):
             if pool_size[i] == -1:
                 pool_size[i] = input.shape[1 + i]
-        with tf.variable_scope("pool_layer_%d" % No):
+        with tf.variable_scope("pool_layer_%s_%d" % (type, No)):
             pooled = tf.nn.max_pool(
                 input,
                 ksize=[1, pool_size[0], pool_size[1], 1],
@@ -155,11 +234,12 @@ class Model(object):
             ret *= int(input.shape[i])
         return ret
 
-    def add_dense_layer(self, No, input, output_size, keep_prob):
-        with tf.variable_scope("dense_layer_%d" % No):
+    def add_dense_layer(self, type, No, input, output_size, keep_prob, r_flag=True):
+        with tf.variable_scope("dense_layer_%s_%d" % (type, No)):
             input_length = self.get_length(input)
             W = tf.get_variable('dense', [input_length, output_size])
-            tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
+            if r_flag:
+                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
             b = tf.get_variable('bias', [output_size])
             data = tf.reshape(input, [-1, int(input_length)])
             data = tf.nn.relu(tf.matmul(data, W) + b)
@@ -167,15 +247,19 @@ class Model(object):
                 data = tf.nn.dropout(data, keep_prob)
         return data
 
-    def add_renet_layer(self, data, input):
+    def add_resnet_layer(self, data, input):
         return data + input
 
     def assign_lr(self, session, lr_value):
         session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
 
     @property
-    def input_data(self):
-        return self._input_data
+    def acc_input_data(self):
+        return self._acc_input_data
+
+    @property
+    def emg_input_data(self):
+        return self._emg_input_data
 
     @property
     def targets(self):
@@ -237,10 +321,13 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
         if status == 'test':
             fetches.append(model.logits)
         feed_dict = {}
-        feed_dict[model.input_data] = x
+        feed_dict[model.acc_input_data] = np.array(list(x[:, 0]))
+        feed_dict[model.emg_input_data] = np.array(list(x[:, 1]))
+        # print(feed_dict[model.acc_input_data].shape)
+        # print(feed_dict[model.emg_input_data].shape)
         feed_dict[model.targets] = y
         if status == 'test':
-           cost, predict_val, _, logits = session.run(fetches, feed_dict)
+            cost, predict_val, _, logits = session.run(fetches, feed_dict)
             # print(y, logits)
         else:
             cost, predict_val, _ = session.run(fetches, feed_dict)
