@@ -8,6 +8,10 @@ import re
 RELAX_NUM_PER_USER = 240
 RELAX_NUM_FREE_PER_USER = 240
 EXTRA_NUM_PER_USER = 240
+SEED_0 = 1136
+SEED_1 = 514
+SEED_2 = 1108
+SEED_3 = 923
 
 
 def generate_data(tag, file_dir):
@@ -21,16 +25,19 @@ def generate_data(tag, file_dir):
             else:
                 data[1] = 0
                 relax_list.append(data)
+        random.seed(SEED_0)
         random.shuffle(relax_list)
         relax_list = relax_list[:RELAX_NUM_PER_USER]
         tense_list.extend(relax_list)
         return np.array(tense_list)
     elif tag == 0:
+        np.random.seed(SEED_1)
         np.random.shuffle(raw_data)
         return raw_data[:RELAX_NUM_FREE_PER_USER]
     else:
         for data in raw_data:
             data[1] = 0
+        np.random.seed(SEED_2)
         np.random.shuffle(raw_data)
         return raw_data[:EXTRA_NUM_PER_USER]
 
@@ -56,6 +63,7 @@ def read_data(input_dir):
             sub_data = generate_data(file_tag, file_path)
             total_data.append(sub_data)
     total_data = np.concatenate(total_data)
+    np.random.seed(SEED_3)
     np.random.shuffle(total_data)
     training_num = len(total_data) // 10 * 9
     test_data = np.array(total_data[training_num:])

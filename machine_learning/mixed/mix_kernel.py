@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 import argparse
 from datetime import datetime
+import matplotlib.pyplot as pl
 
 from mix_provider import Provider
 
@@ -19,6 +20,14 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 FLAGS = flags.FLAGS
+
+fig, axes = pl.subplots(2, 1)
+# print(axes)
+# exit()
+# ax = [axes[0].add_subplot(1, 1, 1), axes[1].add_subplot(2, 1, 2)]
+axes[0].set_ylim([-0.25, 5])
+axes[1].set_ylim([-0.25, 5])
+lines = []
 
 
 def data_type():
@@ -35,7 +44,9 @@ class Model(object):
         self.input_channel = config['input_channel']
         self.acc_model_structure = config['acc_model_structure']
         self.emg_model_structure = config['emg_model_structure']
-        self.regularized_lambda = config.get("regularized_lambda", 0.5)
+        self.acc_regularized_lambda = config.get("acc_regularized_lambda", 0.5)
+        self.emg_regularized_lambda = config.get("emg_regularized_lambda", 0.5)
+        self.regularized_flag = config.get("regularized_flag", True)
         self.model_type = config.get('model_type', 0)
 
         self._acc_input_data = tf.placeholder(data_type(), [self.batch_size, self.input_channel[0], self.input_size[0]])
@@ -67,7 +78,8 @@ class Model(object):
                         input=acc_data,
                         filter_size=layer["filter_size"],
                         out_channels=layer["out_channels"],
-                        filter_type=layer["filter_type"]
+                        filter_type=layer["filter_type"],
+                        regularized_lambda=self.acc_regularized_lambda
                     )
                     acc_data = self.add_pool_layer(
                         type='acc',
@@ -87,7 +99,8 @@ class Model(object):
                         No=layer_No,
                         input=acc_data,
                         output_size=layer["output_size"],
-                        keep_prob=keep_prob
+                        keep_prob=keep_prob,
+                        regularized_lambda=self.acc_regularized_lambda
                     )
                 repeated_times -= 1
                 layer_No += 1
@@ -124,7 +137,7 @@ class Model(object):
                         filter_size=layer["filter_size"],
                         out_channels=layer["out_channels"],
                         filter_type=layer["filter_type"],
-                        r_flag=False
+                        regularized_lambda=self.emg_regularized_lambda
                     )
                     emg_data = self.add_pool_layer(
                         type='emg',
@@ -145,7 +158,7 @@ class Model(object):
                         input=emg_data,
                         output_size=layer["output_size"],
                         keep_prob=keep_prob,
-                        r_flag=False
+                        regularized_lambda=self.emg_regularized_lambda
                     )
                 repeated_times -= 1
                 layer_No += 1
@@ -166,8 +179,9 @@ class Model(object):
         softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
         self.logits = logits = tf.matmul(data, softmax_w) + softmax_b
         # print(self.logits.shape)
-        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits))
-        if is_training and self.regularized_lambda > 0.0001:
+        self.costs = tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits)
+        loss = tf.reduce_mean(self.costs)
+        if is_training and self.regularized_flag:
             tf.add_to_collection("losses", loss)
             self._cost = cost = tf.add_n(tf.get_collection("losses"))
         else:
@@ -198,11 +212,11 @@ class Model(object):
                 inputs=input)
         return tf.convert_to_tensor(outputs)
 
-    def add_conv_layer(self, type, No, input, filter_size, out_channels, filter_type, r_flag=True):
+    def add_conv_layer(self, type, No, input, filter_size, out_channels, filter_type, regularized_lambda, r_flag=True):
         with tf.variable_scope("conv_layer_%s_%d" % (type, No)):
             W = tf.get_variable('filter', [filter_size[0], filter_size[1], input.shape[3], out_channels])
             if r_flag:
-                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
+                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(regularized_lambda)(W))
             b = tf.get_variable('bias', [out_channels])
             conv = tf.nn.conv2d(
                 input,
@@ -234,12 +248,12 @@ class Model(object):
             ret *= int(input.shape[i])
         return ret
 
-    def add_dense_layer(self, type, No, input, output_size, keep_prob, r_flag=True):
+    def add_dense_layer(self, type, No, input, output_size, keep_prob, regularized_lambda, r_flag=True):
         with tf.variable_scope("dense_layer_%s_%d" % (type, No)):
             input_length = self.get_length(input)
             W = tf.get_variable('dense', [input_length, output_size])
             if r_flag:
-                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
+                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(regularized_lambda)(W))
             b = tf.get_variable('bias', [output_size])
             data = tf.reshape(input, [-1, int(input_length)])
             data = tf.nn.relu(tf.matmul(data, W) + b)
@@ -304,6 +318,29 @@ def check_ans(tags, predict_vals):
         No += 1
     return right_num, debug_val
 
+FIRST_DRAW = True
+line_types = ['r.', 'b.']
+def update(deviations):
+    global lines
+    # pl.plot(deviations[0], deviations[1], 'ro')
+    global FIRST_DRAW
+    if FIRST_DRAW:
+        FIRST_DRAW = False
+        for i in range(2):
+            lines.append(axes[i].plot(deviations[i][0], deviations[i][1], line_types[i], linewidth=0.1))
+    else:
+        for i in range(2):
+            lines[i][0].set_xdata(deviations[i][0])
+            lines[i][0].set_ydata(deviations[i][1])
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+    # pl.draw()
+    # pl.clf()
+    pl.pause(0.001)
+
+
+
+
 
 # @make_spin(Spin1, "Running epoch...")
 def run_epoch(session, model, provider, status, eval_op, verbose=False):
@@ -316,19 +353,26 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
     debug_val = 0
     sum = 0
     provider.status = status
-    for step, (x, y) in enumerate(provider()):
+    deviations = [[[], []], [[], []]]
+    for step, (x, y, z) in enumerate(provider()):
         fetches = [model.cost, model.predict_op, eval_op]
         if status == 'test':
             fetches.append(model.logits)
+            fetches.append(model.costs)
         feed_dict = {}
         feed_dict[model.acc_input_data] = np.array(list(x[:, 0]))
         feed_dict[model.emg_input_data] = np.array(list(x[:, 1]))
-        # print(feed_dict[model.acc_input_data].shape)
-        # print(feed_dict[model.emg_input_data].shape)
         feed_dict[model.targets] = y
         if status == 'test':
-            cost, predict_val, _, logits = session.run(fetches, feed_dict)
+            cost, predict_val, _, logits, cost_list = session.run(fetches, feed_dict)
             # print(y, logits)
+            for i in range(len(logits)):
+                if y[i][0] == 0:
+                    deviations[1][0].append(z[i])
+                    deviations[1][1].append(cost_list[i])
+                else:
+                    deviations[0][0].append(z[i])
+                    deviations[0][1].append(cost_list[i])
         else:
             cost, predict_val, _ = session.run(fetches, feed_dict)
         right_num_sub, debug_val_sub = check_ans(y, predict_val)
@@ -340,12 +384,12 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
         epoch_size = provider.get_epoch_size()
         divider_10 = epoch_size // 10
         if verbose and step % divider_10 == 0:
-            print("%.3f speed: %.0f wps time cost: %.3fs precision: %.3f debug_value: %.3f" %
-                  (step * 1.0 / epoch_size,
-                   sum / (time.time() - start_time), time.time() - stage_time, right_num / sum, debug_val / sum))
+            # print("%.3f speed: %.0f wps time cost: %.3fs precision: %.3f debug_value: %.3f" %
+            #       (step * 1.0 / epoch_size,
+            #        sum / (time.time() - start_time), time.time() - stage_time, right_num / sum, debug_val / sum))
             stage_time = time.time()
 
-    return np.exp(costs / iters), right_num / sum, debug_val / sum
+    return np.exp(costs / iters), right_num / sum, debug_val / sum, deviations
 
 
 def main():
@@ -362,8 +406,11 @@ def main():
     config = provider.get_config()
     eval_config = config.copy()
     eval_config['batch_size'] = 1
-    if not os.path.exists("./model"):
-        os.mkdir("./model")
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
+    graph_dir = os.path.join(model_dir, "graphs")
+    if not os.path.exists(graph_dir):
+        os.mkdir(graph_dir)
 
     # print (config)
     # print (eval_config)
@@ -387,35 +434,32 @@ def main():
         best_cost = 10000
         model_No = 0
         best_precision = 0
-        with open("./model/model_config.json", 'w') as file_handle:
+        with open(os.path.join(model_dir, "model_config.json"), 'w') as file_handle:
             file_handle.write(json.dumps(config))
-        log = open("./model/training_log.txt", 'w')
+        log = open(os.path.join(model_dir, "training_log.txt"), 'w')
         for i in range(config['max_epoch']):
             # lr_decay = config['lr_decay'] ** max(i - config['max_epoch'], 0.0)
             # m.assign_lr(session, config['learning_rate'] * lr_decay)
             m.assign_lr(session, config['learning_rate'])
             print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-            print("Starting Time:", datetime.now())
-            train_perplexity, precision, debug_val = run_epoch(session, m, provider, 'train', m.train_op, verbose=True)
-            print("Ending Time:", datetime.now())
-            print("Starting Time:", datetime.now())
-            test_perplexity, precision, debug_val = run_epoch(session, mtest, provider, 'test', tf.no_op())
-            print("COST:", test_perplexity)
-            print("Test Precision: %.3f (%.3f)" % (precision, debug_val))
+            train_perplexity, precision, debug_val, _ = run_epoch(session, m, provider, 'train', m.train_op, verbose=True)
+            print("TRAIN COST:", train_perplexity, "TRAIN PRECISION: %.3f (%.3f)" % (precision, debug_val))
+            test_perplexity, precision, debug_val, deviations = run_epoch(session, mtest, provider, 'test', tf.no_op())
+            update(deviations)
+            print("TEST COST:", test_perplexity, "TEST PRECISION: %.3f (%.3f)" % (precision, debug_val))
             if precision > best_precision or best_precision > test_perplexity:
                 best_precision = precision
                 best_cost = test_perplexity
-                save_path = saver.save(session, './model/model', global_step=model_No)
+                save_path = saver.save(session, '%s/model' % model_dir, global_step=model_No)
                 log.write("No: %d   cost: %s, precision: %s, debug_val: %s\n" % (
                     model_No, test_perplexity, precision, debug_val))
                 model_No += 1
-                print("SAVE!!!!")
-                print("Model saved in file: %s" % save_path)
-
-            print("Ending Time:", datetime.now())
+                pl.savefig(os.path.join(graph_dir, "deviations_%d.png" % model_No), dpi=72)
+                print("SAVE!!!!", "Model saved in file: %s" % save_path)
+            print()
+                # print("Ending Time:", datetime.now())
         print("BEST PRECISION", best_precision)
         log.close()
-
 
 if __name__ == "__main__":
     main()

@@ -55,12 +55,14 @@ class Model(object):
                 elif net_type == "CNN":
                     if len(data.shape) == 3:
                         data = tf.reshape(data, [self.batch_size, self.input_channel, -1, 1])
+                    strides = layer.get("strides", [1, 1, 1, 1])
                     data = self.add_conv_layer(
                         No=layer_No,
                         input=data,
                         filter_size=layer["filter_size"],
                         out_channels=layer["out_channels"],
-                        filter_type=layer["filter_type"]
+                        filter_type=layer["filter_type"],
+                        strides=strides
                     )
                     data = self.add_pool_layer(layer_No, data, layer["pool_size"], [1, 1, 1, 1],
                                                pool_type=layer["pool_type"])
@@ -77,8 +79,10 @@ class Model(object):
                     )
                 repeated_times -= 1
                 layer_No += 1
+                print("layer: %d, output_size: " % layer_No, data.shape)
+
         #
-        print(data.shape)
+        # print(data.shape)
         # exit()
 
         data = tf.reshape(data, [self.batch_size, -1])
@@ -120,7 +124,7 @@ class Model(object):
                 inputs=input)
         return tf.convert_to_tensor(outputs)
 
-    def add_conv_layer(self, No, input, filter_size, out_channels, filter_type):
+    def add_conv_layer(self, No, input, filter_size, out_channels, filter_type, strides):
         with tf.variable_scope("conv_layer_%d" % No):
             W = tf.get_variable('filter', [filter_size[0], filter_size[1], input.shape[3], out_channels])
             tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(self.regularized_lambda)(W))
@@ -128,7 +132,7 @@ class Model(object):
             conv = tf.nn.conv2d(
                 input,
                 W,
-                strides=[1, 1, 1, 1],
+                strides=strides,
                 padding=filter_type,
                 name='conv'
             )
@@ -253,9 +257,9 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
         epoch_size = provider.get_epoch_size()
         divider_10 = epoch_size // 10
         if verbose and step % divider_10 == 0:
-            print("%.3f speed: %.0f wps time cost: %.3fs precision: %.3f debug_value: %.3f" %
-                  (step * 1.0 / epoch_size,
-                   sum / (time.time() - start_time), time.time() - stage_time, right_num / sum, debug_val / sum))
+            # print("%.3f speed: %.0f wps time cost: %.3fs precision: %.3f debug_value: %.3f" %
+            #       (step * 1.0 / epoch_size,
+            #        sum / (time.time() - start_time), time.time() - stage_time, right_num / sum, debug_val / sum))
             stage_time = time.time()
 
     return np.exp(costs / iters), right_num / sum, debug_val / sum
@@ -275,8 +279,8 @@ def main():
     config = provider.get_config()
     eval_config = config.copy()
     eval_config['batch_size'] = 1
-    if not os.path.exists("./model"):
-        os.mkdir("./model")
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
 
     # print (config)
     # print (eval_config)
@@ -300,32 +304,28 @@ def main():
         best_cost = 10000
         model_No = 0
         best_precision = 0
-        with open("./model/model_config.json", 'w') as file_handle:
+        with open(os.path.join(model_dir, "model_config.json"), 'w') as file_handle:
             file_handle.write(json.dumps(config))
-        log = open("./model/training_log.txt", 'w')
+        log = open(os.path.join(model_dir, "training_log.txt"), 'w')
         for i in range(config['max_epoch']):
             # lr_decay = config['lr_decay'] ** max(i - config['max_epoch'], 0.0)
             # m.assign_lr(session, config['learning_rate'] * lr_decay)
             m.assign_lr(session, config['learning_rate'])
             print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-            print("Starting Time:", datetime.now())
             train_perplexity, precision, debug_val = run_epoch(session, m, provider, 'train', m.train_op, verbose=True)
-            print("Ending Time:", datetime.now())
-            print("Starting Time:", datetime.now())
+            print("TRAIN COST:", train_perplexity, "TRAIN PRECISION: %.3f (%.3f)" % (precision, debug_val))
             test_perplexity, precision, debug_val = run_epoch(session, mtest, provider, 'test', tf.no_op())
-            print("COST:", test_perplexity)
-            print("Test Precision: %.3f (%.3f)" % (precision, debug_val))
+            print("TEST COST:", test_perplexity, "TEST PRECISION: %.3f (%.3f)" % (precision, debug_val))
             if precision > best_precision or best_precision > test_perplexity:
                 best_precision = precision
                 best_cost = test_perplexity
-                save_path = saver.save(session, './model/model', global_step=model_No)
+                save_path = saver.save(session, '%s/model' % model_dir, global_step=model_No)
                 log.write("No: %d   cost: %s, precision: %s, debug_val: %s\n" % (
                     model_No, test_perplexity, precision, debug_val))
                 model_No += 1
-                print("SAVE!!!!")
-                print("Model saved in file: %s" % save_path)
-
-            print("Ending Time:", datetime.now())
+                print("SAVE!!!!", "Model saved in file: %s" % save_path)
+            print()
+                # print("Ending Time:", datetime.now())
         print("BEST PRECISION", best_precision)
         log.close()
 

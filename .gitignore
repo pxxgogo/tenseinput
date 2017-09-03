@@ -7,7 +7,7 @@
 /env/**
 **/.idea/**
 .idea/**
-**/model_*/**
+**/model*/**
 **/model/**
 **/key_model/**
 /backup/**

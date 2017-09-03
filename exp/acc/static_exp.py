@@ -19,6 +19,7 @@ WINDOW_SIZE = 400
 SAMPLE_SIZE = 100
 result_window = np.zeros(1)
 result_pointer = 0
+TIMES = 64
 
 
 def update_result_window(ret):
@@ -85,7 +86,7 @@ def run(acc_operation):
         vp = est.feed_data(dt, raw_gyr, raw_acc)
         # print(vp, end="\r")
         for i in range(3):
-            vp[i] = vp[i] * 4096
+            vp[i] = vp[i] * TIMES
         # print(vp)
 
         ret, logits = acc_operation.feed_data(vp)

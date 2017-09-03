@@ -15,7 +15,7 @@ class Provider(object):
     model_sample = {
         'init_scale': 0.1,
         'max_grad_norm': 5,
-        'max_epoch': 600,
+        'max_epoch': 300,
         'keep_prob': 1.0,
         'lr_decay': 0.1,
         'batch_size': 16,
@@ -110,7 +110,7 @@ class Provider(object):
         np.random.shuffle(self.raw_training_data)
         self.training_data = self.get_trainable_data(self.raw_training_data)
         epoch_size = self.get_epoch_size()
-        print("epoch_size", epoch_size)
+        # print("epoch_size", epoch_size)
         if self.status == 'train':
             for i in range(epoch_size):
                 x = self.training_data[0][i * self.batch_size: (i + 1) * self.batch_size]
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     '''
     Debug
     '''
-    provide = Provider('./config.json')
+    provide = Provider('./acc/config_static_6_channels.json')
     provide.status = 'train'
     for x, y in provide():
         print("input", x.shape)

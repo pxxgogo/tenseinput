@@ -47,5 +47,5 @@ for filename in filenames:
                  output_path])
         else:
             subprocess.check_call(
-                ["python", "mix_reader.py", '0', acc_data_path, emg_data_path, '--output_dir',  output_path])
+                ["python", "mix_reader.py", '0', acc_data_path, emg_data_path, '--output_dir', output_path])
         print("Finish ", output_name, time.time() - start_time)

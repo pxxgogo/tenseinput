@@ -1,8 +1,8 @@
 {
-  "data_dir": "../../data/training_data/0903/mix",
+  "data_dir": "../../data/training_data/0901/mixed",
   "sliding_flag": 0,
   "batch_size": 16,
-  "model_type": 1,
+  "model_type": 0,
   "input_size": [
     301,
     30
@@ -14,8 +14,9 @@
     6
   ],
   "learning_rate": 0.0001,
-  "acc_regularized_lambda": 0.05,
-  "emg_regularized_lambda": 0.001,
+  "acc_regularized_lambda": 0.1,
+  "emg_regularized_lambda": 0.1,
+  "regularized_flag": true,
   "acc_model_structure": [
     {
       "net_type": "CNN",
@@ -36,7 +37,7 @@
       "keep_prob": 0.5,
       "net_type": "DENSE",
       "repeated_times": 1,
-      "output_size": 128
+      "output_size": 512
     }
   ],
   "emg_model_structure": [

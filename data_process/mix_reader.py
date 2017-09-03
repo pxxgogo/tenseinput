@@ -3,6 +3,7 @@ import csv
 import json
 
 IGNORED_PADDING_TIME = 250
+IGNORED_PADDING_TIME_END = 400
 IGNORED_PADDING_TIME_TOTAL = 10000
 GENERATION_INTERVAL_TIME = 1500
 
@@ -63,7 +64,7 @@ def generate_key_timestamps(acc_file_name, emg_file_name):
 
     while time < end_time:
         key_timestamps.append(
-            (time, time + GENERATION_INTERVAL_TIME, 0, 0)
+            (time, time + GENERATION_INTERVAL_TIME, 0, -1)
         )
         time += GENERATION_INTERVAL_TIME
     return key_timestamps
@@ -81,10 +82,11 @@ def reader(acc_emg_file_name, data_type, key_timestamps, tense_tag):
             acc_emg_data_per_gesture = [[], [], []]
             for data_str in acc_emg_raw_data_list:
                 acc_emg_raw_data = [float(x) for x in data_str.split()]
-                while acc_emg_raw_data[0] >= key_timestamps[key_No][1] and not choose_flag:
+                while acc_emg_raw_data[0] >= key_timestamps[key_No][1] - IGNORED_PADDING_TIME_END and not choose_flag:
                     key_No += 1
-                if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1]:
-                    acc_emg_data_list.append([acc_emg_data_per_gesture, key_timestamps[key_No][2], key_No])
+                if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1] - IGNORED_PADDING_TIME_END:
+                    acc_emg_data_list.append(
+                        [acc_emg_data_per_gesture, key_timestamps[key_No][2], key_timestamps[key_No][3], key_No])
                     acc_emg_data_per_gesture = [[], [], []]
                     choose_flag = False
                     key_No += 1
@@ -104,10 +106,13 @@ def reader(acc_emg_file_name, data_type, key_timestamps, tense_tag):
             acc_emg_data_per_gesture = [[], [], []]
             for data_str in acc_emg_raw_data_list:
                 acc_emg_raw_data = [float(x) for x in data_str.split()]
-                while acc_emg_raw_data[0] >= key_timestamps[key_No][1] and not choose_flag:
+                while acc_emg_raw_data[0] >= key_timestamps[key_No][1] - IGNORED_PADDING_TIME_END and not choose_flag:
                     key_No += 1
-                if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1]:
-                    acc_emg_data_list.append([acc_emg_data_per_gesture, tense_tag, key_No])
+                if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1] - IGNORED_PADDING_TIME_END:
+                    if tense_tag == 0:
+                        acc_emg_data_list.append([acc_emg_data_per_gesture, tense_tag, -1, key_No])
+                    else:
+                        acc_emg_data_list.append([acc_emg_data_per_gesture, tense_tag, -2, key_No])
                     acc_emg_data_per_gesture = [[], [], []]
                     choose_flag = False
                     key_No += 1
@@ -130,10 +135,11 @@ def reader(acc_emg_file_name, data_type, key_timestamps, tense_tag):
             acc_emg_data_per_gesture = [[], [], [], [], [], []]
             for data_str in acc_emg_raw_data_list:
                 acc_emg_raw_data = [int(x) for x in data_str.split()]
-                while acc_emg_raw_data[0] >= key_timestamps[key_No][1] and not choose_flag:
+                while acc_emg_raw_data[0] >= key_timestamps[key_No][1] - IGNORED_PADDING_TIME_END and not choose_flag:
                     key_No += 1
-                if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1]:
-                    acc_emg_data_list.append([acc_emg_data_per_gesture, key_timestamps[key_No][2], key_No])
+                if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1] - IGNORED_PADDING_TIME_END:
+                    acc_emg_data_list.append(
+                        [acc_emg_data_per_gesture, key_timestamps[key_No][2], key_timestamps[key_No][3], key_No])
                     acc_emg_data_per_gesture = [[], [], [], [], [], []]
                     choose_flag = False
                     key_No += 1
@@ -156,10 +162,13 @@ def reader(acc_emg_file_name, data_type, key_timestamps, tense_tag):
             acc_emg_data_per_gesture = [[], [], [], [], [], []]
             for data_str in acc_emg_raw_data_list:
                 acc_emg_raw_data = [int(x) for x in data_str.split()]
-                while acc_emg_raw_data[0] >= key_timestamps[key_No][1] and not choose_flag:
+                while acc_emg_raw_data[0] >= key_timestamps[key_No][1] - IGNORED_PADDING_TIME_END and not choose_flag:
                     key_No += 1
-                if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1]:
-                    acc_emg_data_list.append([acc_emg_data_per_gesture, tense_tag, key_No])
+                if choose_flag and acc_emg_raw_data[0] >= key_timestamps[key_No][1] - IGNORED_PADDING_TIME_END:
+                    if tense_tag == 0:
+                        acc_emg_data_list.append([acc_emg_data_per_gesture, tense_tag, -1, key_No])
+                    else:
+                        acc_emg_data_list.append([acc_emg_data_per_gesture, tense_tag, -2, key_No])
                     acc_emg_data_per_gesture = [[], [], [], [], [], []]
                     choose_flag = False
                     key_No += 1
@@ -185,13 +194,13 @@ def merge_data(acc_data_list, emg_data_list):
     while acc_index < len(acc_data_list) and emg_index < len(emg_data_list):
         acc_data = acc_data_list[acc_index]
         emg_data = emg_data_list[emg_index]
-        if acc_data[2] == emg_data[2]:
+        if acc_data[3] == emg_data[3]:
             data_list.append(
-                [[acc_data[0], emg_data[0]], acc_data[1]]
+                [[acc_data[0], emg_data[0]], acc_data[1], acc_data[2]]
             )
             acc_index += 1
             emg_index += 1
-        elif acc_data[2] > emg_data[2]:
+        elif acc_data[3] > emg_data[3]:
             emg_index += 1
         else:
             acc_index += 1
@@ -203,7 +212,6 @@ def process(acc_file_name, emg_file_name, key_timestamps, tense_tag):
     emg_data_list = reader(emg_file_name, 'emg', key_timestamps, tense_tag)
     data_list = merge_data(acc_data_list, emg_data_list)
     return data_list
-
 
 
 def print_data(acc_data_list, output_dir):

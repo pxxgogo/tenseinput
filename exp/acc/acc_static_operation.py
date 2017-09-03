@@ -8,7 +8,7 @@ import tensorflow as tf
 from model import Model
 
 INTERVAL_TIME = 300
-WINDOW_SIZE = 400
+WINDOW_SIZE = 600
 
 
 def fft(window_data):

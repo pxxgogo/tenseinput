@@ -54,7 +54,10 @@ class Provider(object):
         self.model_config["emg_model_structure"] = config["emg_model_structure"]
         self.model_config["learning_rate"] = config["learning_rate"]
         self.model_config["model_type"] = config["model_type"]
-        self.model_config["regularized_lambda"] = config.get("regularized_lambda", 0.000001)
+        self.model_config["acc_regularized_lambda"] = config.get("acc_regularized_lambda", 0.000001)
+        self.model_config["emg_regularized_lambda"] = config.get("emg_regularized_lambda", 0.000001)
+        self.model_config["regularized_flag"] = config.get("regularized_flag", True)
+        self.model_config["data_dir"] = self.data_dir
         self.output_type = config["output_type"]
         print("finish parsing config")
 
@@ -62,14 +65,21 @@ class Provider(object):
         if self.output_type == 0:
             return [np.array(list(data[:, 0])), np.array(list(data[:, 1]))]
         else:
+            new_data = []
+            for sub_data in data:
+                # if sub_data[2] in [-2, -1]:
+                #     continue
+                new_data.append(sub_data)
+            data = np.array(new_data)
             x = np.array(list(data[:, 0]))
             raw_y = data[:, 1]
+            gesture_types = data[:, 2]
             y = []
             for sub_raw_y in raw_y:
                 sub_y = [0 for i in range(self.output_size)]
                 sub_y[sub_raw_y] = 1
                 y.append(sub_y)
-            return x, np.array(y)
+            return x, np.array(y), gesture_types
 
     def get_config(self):
         return self.model_config
@@ -96,12 +106,14 @@ class Provider(object):
             for i in range(epoch_size):
                 x = self.training_data[0][i * self.batch_size: (i + 1) * self.batch_size]
                 y = self.training_data[1][i * self.batch_size: (i + 1) * self.batch_size]
-                yield (x, y)
+                z = self.training_data[2][i * self.batch_size: (i + 1) * self.batch_size]
+                yield (x, y, z)
         else:
             for i in range(epoch_size):
                 x = self.test_data[0][i: (i + 1)]
                 y = self.test_data[1][i: (i + 1)]
-                yield (x, y)
+                z = self.test_data[2][i: (i + 1)]
+                yield (x, y, z)
 
 
 if __name__ == "__main__":

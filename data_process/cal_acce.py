@@ -3,7 +3,7 @@ import os
 
 from estimator import Estimator
 
-TIMES = 64
+TIMES = 1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
