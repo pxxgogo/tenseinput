@@ -19,7 +19,7 @@ WINDOW_SIZE = 400
 SAMPLE_SIZE = 100
 result_window = np.zeros(1)
 result_pointer = 0
-TIMES = 64
+TIMES = 1
 
 
 def update_result_window(ret):

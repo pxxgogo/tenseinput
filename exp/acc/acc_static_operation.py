@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from model import Model
 
-INTERVAL_TIME = 300
+INTERVAL_TIME = 200
 WINDOW_SIZE = 600
 
 

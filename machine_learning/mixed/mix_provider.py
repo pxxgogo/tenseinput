@@ -15,7 +15,7 @@ class Provider(object):
     model_sample = {
         'init_scale': 0.1,
         'max_grad_norm': 5,
-        'max_epoch': 600,
+        'max_epoch': 150,
         'keep_prob': 1.0,
         'lr_decay': 0.1,
         'batch_size': 16,
@@ -50,6 +50,8 @@ class Provider(object):
         self.model_config["input_size"] = self.input_size = config["input_size"]
         self.model_config["output_size"] = self.output_size = config["output_size"]
         self.model_config["input_channel"] = self.input_channel = config["input_channel"]
+        self.model_config["ignored_gestures"] = self.ignored_gestures = config.get("ignored_gestures", [])
+        self.model_config["ignored_users"] = self.ignored_users = config.get("ignored_users", [])
         self.model_config["acc_model_structure"] = config["acc_model_structure"]
         self.model_config["emg_model_structure"] = config["emg_model_structure"]
         self.model_config["learning_rate"] = config["learning_rate"]
@@ -67,19 +69,23 @@ class Provider(object):
         else:
             new_data = []
             for sub_data in data:
-                # if sub_data[2] in [-2, -1]:
-                #     continue
+                if sub_data[2] in self.ignored_gestures:
+                    continue
+                if sub_data[3] in self.ignored_users:
+                    continue
                 new_data.append(sub_data)
             data = np.array(new_data)
             x = np.array(list(data[:, 0]))
             raw_y = data[:, 1]
             gesture_types = data[:, 2]
+            users = data[:, 3]
+            sample_ids = data[:, 4]
             y = []
             for sub_raw_y in raw_y:
                 sub_y = [0 for i in range(self.output_size)]
                 sub_y[sub_raw_y] = 1
                 y.append(sub_y)
-            return x, np.array(y), gesture_types
+            return x, np.array(y), gesture_types, users, sample_ids
 
     def get_config(self):
         return self.model_config
@@ -106,14 +112,18 @@ class Provider(object):
             for i in range(epoch_size):
                 x = self.training_data[0][i * self.batch_size: (i + 1) * self.batch_size]
                 y = self.training_data[1][i * self.batch_size: (i + 1) * self.batch_size]
-                z = self.training_data[2][i * self.batch_size: (i + 1) * self.batch_size]
-                yield (x, y, z)
+                gesture_types = self.training_data[2][i * self.batch_size: (i + 1) * self.batch_size]
+                users = self.training_data[3][i * self.batch_size: (i + 1) * self.batch_size]
+                sample_ids = self.training_data[4][i * self.batch_size: (i + 1) * self.batch_size]
+                yield (x, y, gesture_types, users, sample_ids)
         else:
             for i in range(epoch_size):
                 x = self.test_data[0][i: (i + 1)]
                 y = self.test_data[1][i: (i + 1)]
-                z = self.test_data[2][i: (i + 1)]
-                yield (x, y, z)
+                gesture_types = self.test_data[2][i: (i + 1)]
+                users = self.test_data[3][i: (i + 1)]
+                sample_ids = self.test_data[4][i: (i + 1)]
+                yield (x, y, gesture_types, users, sample_ids)
 
 
 if __name__ == "__main__":

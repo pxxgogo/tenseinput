@@ -12,7 +12,7 @@ SAMPLE_SIZE = 100
 
 fig = pl.figure("ACCE")
 ax = fig.add_subplot(1, 1, 1)
-ax.set_xlim([10, 100])
+ax.set_xlim([10, 200])
 ax.set_ylim([0, 12000])
 lines = []
 
@@ -84,7 +84,7 @@ def run():
         vp = est.feed_data(dt, raw_gyr, raw_acc)
         print(vp, end="\r")
         for i in range(3):
-            window_data[i][index] = vp[i]*1024
+            window_data[i][index] = vp[i]*512
 
         index += 1
         sample_num += 1

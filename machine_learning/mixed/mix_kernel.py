@@ -21,7 +21,7 @@ flags.DEFINE_bool("use_fp16", False,
 
 FLAGS = flags.FLAGS
 
-fig, axes = pl.subplots(2, 1)
+fig, axes = pl.subplots(2, 1, sharex=True)
 # print(axes)
 # exit()
 # ax = [axes[0].add_subplot(1, 1, 1), axes[1].add_subplot(2, 1, 2)]
@@ -81,6 +81,36 @@ class Model(object):
                         filter_type=layer["filter_type"],
                         regularized_lambda=self.acc_regularized_lambda
                     )
+                    acc_data = self.add_pool_layer(
+                        type='acc',
+                        No=layer_No,
+                        input=acc_data,
+                        pool_size=layer["pool_size"],
+                        strides=[1, 1, 1, 1],
+                        pool_type=layer["pool_type"]
+                    )
+                elif net_type == "GCNN":
+                    if len(acc_data.shape) == 3:
+                        acc_data = tf.reshape(acc_data, [self.batch_size, self.input_channel[0], -1, 1])
+                    acc_data = self.add_conv_layer(
+                        type='acc',
+                        No=layer_No,
+                        input=acc_data,
+                        filter_size=layer["filter_size"],
+                        out_channels=layer["out_channels"],
+                        filter_type=layer["filter_type"],
+                        regularized_lambda=self.acc_regularized_lambda
+                    )
+                    acc_data_g = self.add_conv_layer(
+                        type='acc_gcnn',
+                        No=layer_No,
+                        input=acc_data,
+                        filter_size=layer["filter_size"],
+                        out_channels=layer["out_channels"],
+                        filter_type=layer["filter_type"],
+                        regularized_lambda=self.acc_regularized_lambda
+                    )
+                    acc_data = tf.multiply(acc_data, tf.sigmoid(acc_data_g))
                     acc_data = self.add_pool_layer(
                         type='acc',
                         No=layer_No,
@@ -318,28 +348,35 @@ def check_ans(tags, predict_vals):
         No += 1
     return right_num, debug_val
 
+
 FIRST_DRAW = True
-line_types = ['r.', 'b.']
+line_types = ['b.', 'r.']
+
+
 def update(deviations):
     global lines
-    # pl.plot(deviations[0], deviations[1], 'ro')
     global FIRST_DRAW
     if FIRST_DRAW:
         FIRST_DRAW = False
         for i in range(2):
-            lines.append(axes[i].plot(deviations[i][0], deviations[i][1], line_types[i], linewidth=0.1))
+            lines.append(axes[i].plot(deviations[i][0], deviations[i][3], line_types[i], linewidth=0.1))
     else:
         for i in range(2):
             lines[i][0].set_xdata(deviations[i][0])
-            lines[i][0].set_ydata(deviations[i][1])
+            lines[i][0].set_ydata(deviations[i][3])
         fig.canvas.draw()
         fig.canvas.flush_events()
-    # pl.draw()
-    # pl.clf()
+        # pl.draw()
+        # pl.clf()
     pl.pause(0.001)
 
 
-
+def add_statistics(deviations, statistics, model_No):
+    for i in range(2):
+        for j in range(len(deviations[i][0])):
+            statistics.append(
+                [str(model_No), str(i), str(deviations[i][0][j]), str(deviations[i][1][j]), str(deviations[i][2][j]),
+                 str(deviations[i][3][j])])
 
 
 # @make_spin(Spin1, "Running epoch...")
@@ -353,8 +390,8 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
     debug_val = 0
     sum = 0
     provider.status = status
-    deviations = [[[], []], [[], []]]
-    for step, (x, y, z) in enumerate(provider()):
+    deviations = [[[], [], [], []], [[], [], [], []]]
+    for step, (x, y, gesture_types, users, sample_ids) in enumerate(provider()):
         fetches = [model.cost, model.predict_op, eval_op]
         if status == 'test':
             fetches.append(model.logits)
@@ -368,11 +405,15 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
             # print(y, logits)
             for i in range(len(logits)):
                 if y[i][0] == 0:
-                    deviations[1][0].append(z[i])
-                    deviations[1][1].append(cost_list[i])
+                    deviations[1][0].append(gesture_types[i])
+                    deviations[1][1].append(users[i])
+                    deviations[1][2].append(sample_ids[i])
+                    deviations[1][3].append(cost_list[i])
                 else:
-                    deviations[0][0].append(z[i])
-                    deviations[0][1].append(cost_list[i])
+                    deviations[0][0].append(gesture_types[i])
+                    deviations[0][1].append(users[i])
+                    deviations[0][2].append(sample_ids[i])
+                    deviations[0][3].append(cost_list[i])
         else:
             cost, predict_val, _ = session.run(fetches, feed_dict)
         right_num_sub, debug_val_sub = check_ans(y, predict_val)
@@ -409,6 +450,8 @@ def main():
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
     graph_dir = os.path.join(model_dir, "graphs")
+    statistics_path = os.path.join(model_dir, "statistics.csv")
+    statistics = []
     if not os.path.exists(graph_dir):
         os.mkdir(graph_dir)
 
@@ -442,24 +485,37 @@ def main():
             # m.assign_lr(session, config['learning_rate'] * lr_decay)
             m.assign_lr(session, config['learning_rate'])
             print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-            train_perplexity, precision, debug_val, _ = run_epoch(session, m, provider, 'train', m.train_op, verbose=True)
+            train_perplexity, precision, debug_val, _ = run_epoch(session, m, provider, 'train', m.train_op,
+                                                                  verbose=True)
             print("TRAIN COST:", train_perplexity, "TRAIN PRECISION: %.3f (%.3f)" % (precision, debug_val))
-            test_perplexity, precision, debug_val, deviations = run_epoch(session, mtest, provider, 'test', tf.no_op())
+            test_perplexity, precision, debug_val, deviations = run_epoch(session, mtest, provider, 'test',
+                                                                          tf.no_op())
             update(deviations)
             print("TEST COST:", test_perplexity, "TEST PRECISION: %.3f (%.3f)" % (precision, debug_val))
-            if precision > best_precision or best_precision > test_perplexity:
-                best_precision = precision
-                best_cost = test_perplexity
+            if precision > best_precision or best_cost > test_perplexity:
+                if precision > best_precision:
+                    best_precision = precision
+                if best_cost > test_perplexity:
+                    best_cost = test_perplexity
                 save_path = saver.save(session, '%s/model' % model_dir, global_step=model_No)
                 log.write("No: %d   cost: %s, precision: %s, debug_val: %s\n" % (
                     model_No, test_perplexity, precision, debug_val))
                 model_No += 1
+                add_statistics(deviations, statistics, model_No)
                 pl.savefig(os.path.join(graph_dir, "deviations_%d.png" % model_No), dpi=72)
                 print("SAVE!!!!", "Model saved in file: %s" % save_path)
             print()
-                # print("Ending Time:", datetime.now())
+            # print("Ending Time:", datetime.now())
         print("BEST PRECISION", best_precision)
+        with open(statistics_path, 'w') as file_handle:
+            csv_str_list = ["\"models\", \"is_tense\", \"gesture_type\", \"user_id\", \"sample_id\", \"cost\""]
+            for statistic in statistics:
+                csv_str = ",".join(statistic)
+                csv_str_list.append(csv_str)
+            csv_content = "\n".join(csv_str_list)
+            file_handle.write(csv_content)
         log.close()
+
 
 if __name__ == "__main__":
     main()

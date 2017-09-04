@@ -1,5 +1,5 @@
 {
-  "data_dir": "../data/training_data/0901/acc_1",
+  "data_dir": "../data/training_data/0904/mixed_excluded_u7",
   "sliding_flag": 0,
   "batch_size": 16,
   "input_size": 301,

@@ -1,13 +1,11 @@
 {
-  "data_dir": "../../data/training_data/0903/mixed",
+  "data_dir": "../../data/training_data/0904/mixed_more_critical_gestures",
   "sliding_flag": 0,
   "batch_size": 16,
   "model_type": 0,
-  "ignored_gestures": [],
-  "ignored_users": [],
   "input_size": [
-    301,
-    30
+    151,
+    20
   ],
   "output_size": 2,
   "output_type": 1,
@@ -19,6 +17,8 @@
   "acc_regularized_lambda": 0.05,
   "emg_regularized_lambda": 0.0001,
   "regularized_flag": true,
+  "ignored_gestures": [9],
+  "ignored_users": [],
   "acc_model_structure": [
     {
       "net_type": "CNN",

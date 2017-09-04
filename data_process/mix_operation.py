@@ -3,43 +3,51 @@ import json
 import numpy as np
 import random
 
-EMG_PADDING = 10
-EMG_SPLIT_WINDOW_SIZE = 30
+EMG_SPLIT_WINDOW_SIZE = 20
 
-ACC_PADDING = 200
-ACC_SPLIT_WINDOW_SIZE = 600
-MAX_DATA_NUM = 1300
+ACC_PADDING = 100
+ACC_SPLIT_WINDOW_SIZE = 300
 
+CRITICAL_TIMES = 2
+CRITICAL_GESTURES = [11, 17, 10, 20, 13, 14]
 
 def prune_data(raw_data):
     data_list = []
     for data in raw_data:
         emg_data = data[0][1]
         acc_data = data[0][0]
-        emg_pruned_data = []
-        flag = True
-        for i in range(6):
-            x = emg_data[i][-EMG_SPLIT_WINDOW_SIZE:]
-            if not len(x) == EMG_SPLIT_WINDOW_SIZE:
-                flag = False
-        if not flag:
-            continue
-        for i in range(6):
-            x = emg_data[i][-EMG_SPLIT_WINDOW_SIZE:]
-            emg_pruned_data.append(x[:EMG_SPLIT_WINDOW_SIZE])
-
-        acc_pruned_data = []
-        flag = True
-        for i in range(3):
-            x = acc_data[i][-ACC_SPLIT_WINDOW_SIZE:]
-            if not len(x) == ACC_SPLIT_WINDOW_SIZE:
-                flag = False
-        if not flag:
-            continue
-        for i in range(3):
-            x = acc_data[i][-ACC_SPLIT_WINDOW_SIZE:]
-            acc_pruned_data.append(x[:ACC_SPLIT_WINDOW_SIZE])
-        data_list.append([[acc_pruned_data, emg_pruned_data], data[1], data[2]])
+        gesture_No = data[2]
+        if gesture_No in CRITICAL_GESTURES:
+            critical_times = CRITICAL_TIMES
+            # print(gesture_No)
+        else:
+            critical_times = 1
+        for k in range(critical_times):
+            emg_pruned_data = []
+            flag = True
+            for i in range(6):
+                # print(len(emg_data[i]))
+                x = emg_data[i][-(k + 1) * EMG_SPLIT_WINDOW_SIZE: len(emg_data[i]) - k * EMG_SPLIT_WINDOW_SIZE]
+                if not len(x) == EMG_SPLIT_WINDOW_SIZE:
+                    flag = False
+            if not flag:
+                continue
+            for i in range(6):
+                x = emg_data[i][-(k + 1) * EMG_SPLIT_WINDOW_SIZE: len(emg_data[i]) - k * EMG_SPLIT_WINDOW_SIZE]
+                emg_pruned_data.append(x)
+        
+            acc_pruned_data = []
+            flag = True
+            for i in range(3):
+                x = acc_data[i][-(k + 1) * ACC_SPLIT_WINDOW_SIZE: len(acc_data[i]) - k * ACC_SPLIT_WINDOW_SIZE]
+                if not len(x) == ACC_SPLIT_WINDOW_SIZE:
+                    flag = False
+            if not flag:
+                continue
+            for i in range(3):
+                x = acc_data[i][-(k + 1) * ACC_SPLIT_WINDOW_SIZE: len(acc_data[i]) - k * ACC_SPLIT_WINDOW_SIZE]
+                acc_pruned_data.append(x)
+            data_list.append([[acc_pruned_data, emg_pruned_data], data[1], data[2]])
     return data_list
 
 
