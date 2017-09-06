@@ -59,6 +59,13 @@ class Provider(object):
         self.model_config["acc_regularized_lambda"] = config.get("acc_regularized_lambda", 0.000001)
         self.model_config["emg_regularized_lambda"] = config.get("emg_regularized_lambda", 0.000001)
         self.model_config["regularized_flag"] = config.get("regularized_flag", True)
+        self.model_config["emg_sequence_flag"] = self.emg_sequence_flag = config.get("emg_sequence_flag", False)
+        self.model_config["acc_sequence_flag"] = self.acc_sequence_flag = config.get("acc_sequence_flag", False)
+        self.model_config["multi_window_flag"] = self.multi_window_flag = config.get("multi_window_flag", 0)
+        # multi_window_flag: 0 normal corpus: 3-dimension (batch, channels, input_size)
+        # multi_window_flag: 1 multi-window corpus 4-dimension (batch, windows, channels, input_size)
+        # multi_window_flag: 2 multi-window corpus 4-dimension training as normal corpus with double corpus
+        self.model_config["sequence_size"] = config.get("sequence_size", [1, 1])
         self.model_config["data_dir"] = self.data_dir
         self.output_type = config["output_type"]
         print("finish parsing config")
@@ -68,14 +75,21 @@ class Provider(object):
             return [np.array(list(data[:, 0])), np.array(list(data[:, 1]))]
         else:
             new_data = []
+            acc_x_list = []
+            emg_x_list = []
             for sub_data in data:
                 if sub_data[2] in self.ignored_gestures:
                     continue
                 if sub_data[3] in self.ignored_users:
                     continue
                 new_data.append(sub_data)
+                acc_x_list.append(sub_data[0][0])
+                emg_x_list.append(sub_data[0][1])
             data = np.array(new_data)
-            x = np.array(list(data[:, 0]))
+            acc_x = np.array(acc_x_list)
+            emg_x = np.array(emg_x_list)
+            # x = data[:, 0]
+            # print(acc_x.shape, emg_x.shape)
             raw_y = data[:, 1]
             gesture_types = data[:, 2]
             users = data[:, 3]
@@ -85,7 +99,7 @@ class Provider(object):
                 sub_y = [0 for i in range(self.output_size)]
                 sub_y[sub_raw_y] = 1
                 y.append(sub_y)
-            return x, np.array(y), gesture_types, users, sample_ids
+            return (acc_x, emg_x), np.array(y), gesture_types, users, sample_ids
 
     def get_config(self):
         return self.model_config
@@ -96,9 +110,10 @@ class Provider(object):
 
     def get_epoch_size(self):
         if self.status == 'train':
-            return (len(self.training_data[0])) // self.batch_size - 1
+            return len(self.training_data[1]) // self.batch_size - 1
+
         elif self.status == 'test':
-            return len(self.test_data[0]) - 1
+            return len(self.test_data[1]) - 1
         else:
             return None
 
@@ -110,20 +125,63 @@ class Provider(object):
         print("epoch_size", epoch_size)
         if self.status == 'train':
             for i in range(epoch_size):
-                x = self.training_data[0][i * self.batch_size: (i + 1) * self.batch_size]
-                y = self.training_data[1][i * self.batch_size: (i + 1) * self.batch_size]
-                gesture_types = self.training_data[2][i * self.batch_size: (i + 1) * self.batch_size]
-                users = self.training_data[3][i * self.batch_size: (i + 1) * self.batch_size]
-                sample_ids = self.training_data[4][i * self.batch_size: (i + 1) * self.batch_size]
-                yield (x, y, gesture_types, users, sample_ids)
+                if self.multi_window_flag == 0:
+                    acc_x = self.training_data[0][0][i * self.batch_size: (i + 1) * self.batch_size]
+                    emg_x = self.training_data[0][1][i * self.batch_size: (i + 1) * self.batch_size]
+                    y = self.training_data[1][i * self.batch_size: (i + 1) * self.batch_size]
+                    gesture_types = self.training_data[2][i * self.batch_size: (i + 1) * self.batch_size]
+                    users = self.training_data[3][i * self.batch_size: (i + 1) * self.batch_size]
+                    sample_ids = self.training_data[4][i * self.batch_size: (i + 1) * self.batch_size]
+                    yield ((acc_x, emg_x), y, gesture_types, users, sample_ids)
+                elif self.multi_window_flag == 1:
+                    if self.emg_sequence_flag:
+                        emg_x = self.training_data[0][1][i * self.batch_size: (i + 1) * self.batch_size]
+                    else:
+                        emg_x = self.training_data[0][1][i * self.batch_size: (i + 1) * self.batch_size, 0]
+                    if self.acc_sequence_flag:
+                        acc_x = self.training_data[0][0][i * self.batch_size: (i + 1) * self.batch_size]
+                    else:
+                        acc_x = self.training_data[0][0][i * self.batch_size: (i + 1) * self.batch_size, 0]
+                    y = self.training_data[1][i * self.batch_size: (i + 1) * self.batch_size]
+                    gesture_types = self.training_data[2][i * self.batch_size: (i + 1) * self.batch_size]
+                    users = self.training_data[3][i * self.batch_size: (i + 1) * self.batch_size]
+                    sample_ids = self.training_data[4][i * self.batch_size: (i + 1) * self.batch_size]
+                    yield ((acc_x, emg_x), y, gesture_types, users, sample_ids)
+                else:
+                    acc_x = self.training_data[0][0][i * self.batch_size: (i + 1) * self.batch_size, 0]
+                    emg_x = self.training_data[0][1][i * self.batch_size: (i + 1) * self.batch_size, 0]
+                    y = self.training_data[1][i * self.batch_size: (i + 1) * self.batch_size]
+                    gesture_types = self.training_data[2][i * self.batch_size: (i + 1) * self.batch_size]
+                    users = self.training_data[3][i * self.batch_size: (i + 1) * self.batch_size]
+                    sample_ids = self.training_data[4][i * self.batch_size: (i + 1) * self.batch_size]
+                    yield ((acc_x, emg_x), y, gesture_types, users, sample_ids)
+                    acc_x = self.training_data[0][0][i * self.batch_size: (i + 1) * self.batch_size, 1]
+                    emg_x = self.training_data[0][1][i * self.batch_size: (i + 1) * self.batch_size, 1]
+                    yield ((acc_x, emg_x), y, gesture_types, users, sample_ids)
         else:
             for i in range(epoch_size):
-                x = self.test_data[0][i: (i + 1)]
-                y = self.test_data[1][i: (i + 1)]
-                gesture_types = self.test_data[2][i: (i + 1)]
-                users = self.test_data[3][i: (i + 1)]
-                sample_ids = self.test_data[4][i: (i + 1)]
-                yield (x, y, gesture_types, users, sample_ids)
+                if self.multi_window_flag == 0:
+                    acc_x = self.test_data[0][0][i: (i + 1)]
+                    emg_x = self.test_data[0][1][i: (i + 1)]
+                    y = self.test_data[1][i: (i + 1)]
+                    gesture_types = self.test_data[2][i: (i + 1)]
+                    users = self.test_data[3][i: (i + 1)]
+                    sample_ids = self.test_data[4][i: (i + 1)]
+                    yield ((acc_x, emg_x), y, gesture_types, users, sample_ids)
+                else:
+                    if self.multi_window_flag == 1 and self.acc_sequence_flag:
+                        acc_x = self.test_data[0][0][i: (i + 1)]
+                    else:
+                        acc_x = self.test_data[0][0][i: (i + 1), 0]
+                    if self.multi_window_flag == 1 and self.emg_sequence_flag:
+                        emg_x = self.test_data[0][1][i: (i + 1)]
+                    else:
+                        emg_x = self.test_data[0][1][i: (i + 1), 0]
+                    y = self.test_data[1][i: (i + 1)]
+                    gesture_types = self.test_data[2][i: (i + 1)]
+                    users = self.test_data[3][i: (i + 1)]
+                    sample_ids = self.test_data[4][i: (i + 1)]
+                    yield ((acc_x, emg_x), y, gesture_types, users, sample_ids)
 
 
 if __name__ == "__main__":
@@ -132,7 +190,17 @@ if __name__ == "__main__":
     '''
     provide = Provider('./config.json')
     provide.status = 'train'
-    for x, y in provide():
-        print("input", x.shape)
-        print("output", y.shape)
+    value = 151
+    for x, y, gesture_types, users, sample_ids in provide():
+        print(x[0].shape, x[1].shape)
         input("Next")
+        # for i in range(16):
+        #     if len(t[0][i][0][0][0]) == value and len(t[0][i][0][0][1]) == value \
+        #             and len(t[0][i][0][0][2]) == value and len(t[0][i][0][1][0]) == value and len(
+        #         t[0][i][0][1][1]) == value and len(t[0][i][0][1][2]) == value:
+        #         pass
+        #     else:
+        #         print("input", len(t[0][i][0][0][0]), len(t[0][i][0][0][1]),
+        #               len(t[0][i][0][0][2]), len(t[0][i][0][1][0]), len(t[0][i][0][1][1]), len(t[0][i][0][1][2]))
+        # print("output", t[1].shape)
+        # input("Next")

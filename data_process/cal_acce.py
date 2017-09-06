@@ -22,7 +22,7 @@ if __name__ == "__main__":
     last_timestamp = -1
     for raw_data_str in raw_data_list:
         raw_data_str = raw_data_str[:-1]
-        raw_data = [x for x in raw_data_str.split()]
+        raw_data = [x for x in raw_data_str.split(", ")]
         timestamp = float(raw_data[0])
         acce_raw_data = [int(x) for x in raw_data[4:7]]
         gyro_data = [int(x) for x in raw_data[1:4]]

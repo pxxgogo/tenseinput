@@ -18,6 +18,7 @@ output_dir = args.output_dir
 EXTRA_COMPILER = re.compile('extra')
 T_R_COMPILER = re.compile('t_r')
 RELAX_COMPILER = re.compile('relax')
+E_T_COMPILER = re.compile('e_t')
 
 start_time = time.time()
 filenames = os.listdir(acc_input_dir)
@@ -26,6 +27,7 @@ for filename in filenames:
         extra_ok = EXTRA_COMPILER.findall(filename)
         t_r_ok = T_R_COMPILER.findall(filename)
         relax_ok = RELAX_COMPILER.findall(filename)
+        e_t_ok = E_T_COMPILER.findall(filename)
         acc_data_path = os.path.join(acc_input_dir, filename)
         emg_data_path = os.path.join(emg_input_dir, filename)
         if not os.access(acc_data_path, os.R_OK) or not os.access(emg_data_path, os.R_OK):
@@ -44,6 +46,12 @@ for filename in filenames:
             log_path = os.path.join(log_input_dir, log_name)
             subprocess.check_call(
                 ["python", "mix_reader.py", '1', acc_data_path, emg_data_path, '--csv', log_path, '--output_dir',
+                 output_path])
+        elif len(e_t_ok) > 0:
+            log_name = re.sub(".txt", "_log.csv", filename)
+            log_path = os.path.join(log_input_dir, log_name)
+            subprocess.check_call(
+                ["python", "mix_reader.py", '3', acc_data_path, emg_data_path, '--csv', log_path, '--output_dir',
                  output_path])
         else:
             subprocess.check_call(

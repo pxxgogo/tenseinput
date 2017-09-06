@@ -5,13 +5,14 @@ import random
 import os
 import re
 
-RELAX_NUM_PER_USER = 290
-RELAX_NUM_FREE_PER_USER = 290
+RELAX_NUM_PER_USER = 240
+RELAX_NUM_FREE_PER_USER = 240
 EXTRA_NUM_PER_USER = 240
 SEED_0 = 1136
 SEED_1 = 514
 SEED_2 = 1108
 SEED_3 = 923
+SEED_4 = 722
 
 
 def generate_data(tag, file_dir, user_id):
@@ -28,27 +29,36 @@ def generate_data(tag, file_dir, user_id):
         random.shuffle(relax_list)
         relax_list = relax_list[:RELAX_NUM_PER_USER]
         tense_list.extend(relax_list)
-        return np.array(tense_list)
+        return tense_list
     elif tag == 0:
         freestyle_list = []
         for i, data in enumerate(raw_data):
             freestyle_list.append([data[0], 0, data[2], user_id, i])
         random.seed(SEED_1)
         random.shuffle(freestyle_list)
-        return np.array(freestyle_list[:RELAX_NUM_FREE_PER_USER])
+        return freestyle_list[:RELAX_NUM_FREE_PER_USER]
+    elif tag == 3:
+        e_t_list = []
+        for i, data in enumerate(raw_data):
+            e_t_list.append([data[0], 1, -3, user_id, i])
+        random.seed(SEED_4)
+        random.shuffle(e_t_list)
+        return e_t_list[:EXTRA_NUM_PER_USER]
     else:
         extra_list = []
         for i, data in enumerate(raw_data):
             extra_list.append([data[0], 0, data[2], user_id, i])
         random.seed(SEED_2)
         random.shuffle(extra_list)
-        return np.array(extra_list[:EXTRA_NUM_PER_USER])
+        return extra_list[:EXTRA_NUM_PER_USER]
 
 
 def read_data(input_dir, users_info):
     EXTRA_COMPILER = re.compile('extra')
     T_R_COMPILER = re.compile('t_r')
     RELAX_COMPILER = re.compile('relax')
+    E_T_COMPILER = re.compile('e_t')
+
     filenames = os.listdir(input_dir)
     total_data = []
     for filename in filenames:
@@ -56,6 +66,7 @@ def read_data(input_dir, users_info):
             extra_ok = EXTRA_COMPILER.findall(filename)
             t_r_ok = T_R_COMPILER.findall(filename)
             relax_ok = RELAX_COMPILER.findall(filename)
+            e_t_ok = E_T_COMPILER.findall(filename)
             file_path = os.path.join(input_dir, filename)
             if len(extra_ok) > 0:
                 user_name = re.sub("_extra.npy", "", filename)
@@ -63,6 +74,9 @@ def read_data(input_dir, users_info):
             elif len(t_r_ok) > 0:
                 user_name = re.sub("_t_r.npy", "", filename)
                 file_tag = 1
+            elif len(e_t_ok) > 0:
+                user_name = re.sub("_e_t.npy", "", filename)
+                file_tag = 3
             else:
                 user_name = re.sub("_relax.npy", "", filename)
                 file_tag = 0
@@ -79,6 +93,7 @@ def read_data(input_dir, users_info):
 
 
 def export(training_data, test_data, output_dir):
+    print(training_data.shape, training_data[0][0][0].shape, training_data[0][0][1].shape)
     np.save(os.path.join(output_dir, "training_data"), training_data)
     np.save(os.path.join(output_dir, "test_data"), test_data)
     di = {}
