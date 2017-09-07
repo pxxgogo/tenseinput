@@ -1,13 +1,13 @@
 {
-  "data_dir": "../../data/training_data/0905/mix_2_sliding_window_e_t",
-  "multi_window_flag": 1,
+  "data_dir": "../../data/training_data/0906/mix_single_window",
+  "multi_window_flag": 0,
   "batch_size": 16,
   "model_type": 1,
   "ignored_gestures": [],
   "ignored_users": [],
   "input_size": [
-    201,
-    20
+    251,
+    25
   ],
   "output_size": 2,
   "output_type": 1,
@@ -16,87 +16,18 @@
     6
   ],
   "sequence_size": [
-    2,
-    2
+    1,
+    1
   ],
   "acc_sequence_flag": true,
-  "emg_sequence_flag": false,
+  "emg_sequence_flag": true,
   "learning_rate": 0.0001,
-  "acc_regularized_lambda": 0.05,
+  "acc_regularized_lambda": 0.01,
   "emg_regularized_lambda": 0.0001,
-  "regularized_flag": true,
+  "regularized_flag": false,
   "acc_model_structure": [
-    {
-      "net_type": "CNN3D",
-      "pool_size": [
-        1,
-        1,
-        10
-      ],
-      "filter_type": "VALID",
-      "pool_type": "VALID",
-      "repeated_times": 1,
-      "filter_size": [
-        2,
-        2,
-        10
-      ],
-      "out_channels": 16
-    },
-    {
-      "net_type": "CNN3D",
-      "pool_size": [
-        1,
-        1,
-        10
-      ],
-      "filter_type": "SAME",
-      "pool_type": "VALID",
-      "repeated_times": 3,
-      "filter_size": [
-        1,
-        2,
-        10
-      ],
-      "out_channels": 16
-    },
-    {
-      "keep_prob": 0.5,
-      "net_type": "DENSE",
-      "repeated_times": 1,
-      "output_size": 128
-    }
   ],
   "emg_model_structure": [
-    {
-      "net_type": "CNN",
-      "repeated_times": 2,
-      "filter_size": [
-        2,
-        2
-      ],
-      "out_channels": 16,
-      "pool_size": [
-        2,
-        2
-      ],
-      "filter_type": "VALID",
-      "pool_type": "VALID"
-    },
-    {
-      "net_type": "CNN",
-      "repeated_times": 1,
-      "filter_size": [
-        2,
-        2
-      ],
-      "out_channels": 16,
-      "pool_size": [
-        1,
-        2
-      ],
-      "filter_type": "VALID",
-      "pool_type": "VALID"
-    }
+
   ]
 }

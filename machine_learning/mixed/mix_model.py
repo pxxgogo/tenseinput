@@ -7,7 +7,6 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 FLAGS = flags.FLAGS
-DEVICES = "/cpu:0"
 
 
 def data_type():
@@ -17,8 +16,8 @@ def data_type():
 class Model(object):
     """The RNN model."""
 
-    def __init__(self, config):
-        self.batch_size = 1
+    def __init__(self, is_training, config):
+        self.batch_size = config['batch_size']
         self.input_size = config['input_size']
         self.output_size = config['output_size']
         self.input_channel = config['input_channel']
@@ -32,6 +31,45 @@ class Model(object):
         self.emg_sequence_flag = config.get("emg_sequence_flag", True)
         self.sequence_size = config.get("sequence_size", [1, 1])
         self.model_type = config.get('model_type', 0)
+        acc_data = self.acc_process(is_training)
+        emg_data = self.emg_process(is_training)
+
+        self._targets = tf.placeholder(tf.int16, [self.batch_size, self.output_size])
+        if self.model_type == 0:
+            data = tf.concat([acc_data, emg_data], axis=1)
+        elif self.model_type == 1:
+            data = acc_data
+        else:
+            data = emg_data
+        softmax_w = tf.get_variable(
+            "softmax_w", [data.shape[1], self.output_size], dtype=data_type())
+        softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
+        self.logits = logits = tf.matmul(data, softmax_w) + softmax_b
+        # print(self.logits.shape)
+        self.costs = tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits)
+        loss = tf.reduce_mean(self.costs)
+        if is_training and self.regularized_flag:
+            tf.add_to_collection("losses", loss)
+            self._cost = cost = tf.add_n(tf.get_collection("losses"))
+        else:
+            self._cost = cost = loss
+
+        self._predict_op = tf.argmax(logits, 1)
+
+        if not is_training:
+            return
+
+        self._lr = tf.Variable(0.0, trainable=False)
+        tvars = tf.trainable_variables()
+        grads, _ = tf.clip_by_global_norm(tf.gradients(cost, tvars),
+                                          config['max_grad_norm'])
+        optimizer = tf.train.AdamOptimizer(self._lr)
+        self._train_op = optimizer.apply_gradients(zip(grads, tvars))
+
+        self._new_lr = tf.placeholder(tf.float32, shape=[], name="new_learning_rate")
+        self._lr_update = tf.assign(self._lr, self._new_lr)
+
+    def acc_process(self, is_training):
         if self.acc_sequence_flag and self.multi_window_flag == 1:
             self._acc_input_data = tf.placeholder(data_type(),
                                                   [self.batch_size, self.sequence_size[0], self.input_channel[0],
@@ -39,8 +77,8 @@ class Model(object):
         else:
             self._acc_input_data = tf.placeholder(data_type(),
                                                   [self.batch_size, self.input_channel[0], self.input_size[0]])
-        self._targets = tf.placeholder(tf.int16, [self.batch_size, self.output_size])
         acc_data = self._acc_input_data
+
         layer_No = 0
         for i, layer in enumerate(self.acc_model_structure):
             net_type = layer["net_type"]
@@ -54,7 +92,7 @@ class Model(object):
                         hidden_size=layer["hidden_size"]
                     )
                 elif net_type == "RESNET":
-                    data = self.add_resnet_layer(
+                    acc_data = self.add_resnet_layer(
                         data=acc_data,
                         input=self._acc_input_data)
                 elif net_type == "CNN":
@@ -108,7 +146,10 @@ class Model(object):
                         pool_type=layer["pool_type"]
                     )
                 elif net_type == "DENSE":
-                    keep_prob = 1.0
+                    if is_training:
+                        keep_prob = layer.get("keep_prob", 1.0)
+                    else:
+                        keep_prob = 1.0
                     acc_data = self.add_dense_layer(
                         type='acc',
                         No=layer_No,
@@ -141,23 +182,111 @@ class Model(object):
                 repeated_times -= 1
                 layer_No += 1
 
-        print(acc_data.shape)
-        # exit()
+        # acc_data = self._acc_input_data
+        # if is_training:
+        #     keep_prob = 0.5
+        # else:
+        #     keep_prob = 1.0
+        # # acc_data = tf.reshape(acc_data, [self.batch_size, self.sequence_size[0], -1])
+        # # acc_data = self.add_lstm_layer("acc_test", 0, acc_data, 64, keep_prob)
+        # # acc_data = acc_data[:, 4]
+        # acc_data = self.add_dense_layer("acc_dense", 0, acc_data, 128, keep_prob, 0.5, True)
+        # acc_data = self.add_dense_layer("acc_dense", 1, acc_data, 64, keep_prob, 0.5, True)
+        # acc_data = self.add_dense_layer("acc_dense", 2, acc_data, 16, keep_prob, 0.5, True)
+        # #acc_data = self.add_lstm_layer("acc_test", 1, acc_data, 300)
+        #print(acc_data.shape)
         acc_data = tf.reshape(acc_data, [self.batch_size, -1])
-        data = acc_data
-        softmax_w = tf.get_variable(
-            "softmax_w", [data.shape[1], self.output_size], dtype=data_type())
-        softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
-        self.logits = logits = tf.matmul(data, softmax_w) + softmax_b
-        # print(self.logits.shape)
-        self.costs = tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits)
-        loss = tf.reduce_mean(self.costs)
-        self._cost = cost = loss
-        self._predict_op = tf.argmax(logits, 1)
 
-    def add_lstm_layer(self, type, No, input, hidden_size):
+        return acc_data
+
+    def emg_process(self, is_training):
+        if self.emg_sequence_flag and self.multi_window_flag == 1:
+            self._emg_input_data = tf.placeholder(data_type(),
+                                                  [self.batch_size, self.sequence_size[1], self.input_channel[1],
+                                                   self.input_size[1]])
+        else:
+            self._emg_input_data = tf.placeholder(data_type(),
+                                                  [self.batch_size, self.input_channel[1], self.input_size[1]])
+        emg_data = self._emg_input_data
+        layer_No = 0
+        for i, layer in enumerate(self.emg_model_structure):
+            net_type = layer["net_type"]
+            repeated_times = layer.get("repeated_times", 1)
+            while repeated_times > 0:
+                if net_type == "LSTM":
+                    emg_data = self.add_lstm_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        hidden_size=layer["hidden_size"]
+                    )
+                elif net_type == "RESNET":
+                    data = self.add_resnet_layer(
+                        data=emg_data,
+                        input=self._emg_input_data)
+                elif net_type == "CNN":
+                    if len(emg_data.shape) == 3:
+                        emg_data = tf.reshape(emg_data, [self.batch_size, self.input_channel[1], -1, 1])
+                    emg_data = self.add_conv_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        filter_size=layer["filter_size"],
+                        out_channels=layer["out_channels"],
+                        filter_type=layer["filter_type"],
+                        regularized_lambda=self.emg_regularized_lambda
+                    )
+                    emg_data = self.add_pool_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        pool_size=layer["pool_size"],
+                        strides=[1, 1, 1, 1],
+                        pool_type=layer["pool_type"]
+                    )
+                elif net_type == "DENSE":
+                    if is_training:
+                        keep_prob = layer.get("keep_prob", 1.0)
+                    else:
+                        keep_prob = 1.0
+                    emg_data = self.add_dense_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        output_size=layer["output_size"],
+                        keep_prob=keep_prob,
+                        regularized_lambda=self.emg_regularized_lambda
+                    )
+                elif net_type == "CNN3D":
+                    if len(emg_data.shape) < 5:
+                        emg_data = tf.reshape(emg_data,
+                                              [self.batch_size, self.sequence_size[1], self.input_channel[1], -1, 1])
+                    emg_data = self.add_conv3d_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        filter_size=layer["filter_size"],
+                        out_channels=layer["out_channels"],
+                        filter_type=layer["filter_type"],
+                        regularized_lambda=self.emg_regularized_lambda
+                    )
+                    emg_data = self.add_pool3d_layer(
+                        type='emg',
+                        No=layer_No,
+                        input=emg_data,
+                        pool_size=layer["pool_size"],
+                        strides=[1, 1, 1, 1, 1],
+                        pool_type=layer["pool_type"]
+                    )
+                repeated_times -= 1
+                layer_No += 1
+        emg_data = tf.reshape(emg_data, [self.batch_size, -1])
+        return emg_data
+
+    def add_lstm_layer(self, type, No, input, hidden_size, keep_prob=1.0):
         lstm_cell = tf.contrib.rnn.BasicLSTMCell(hidden_size, forget_bias=0.0, state_is_tuple=True,
                                                  reuse=tf.get_variable_scope().reuse)
+        lstm_cell = tf.nn.rnn_cell.DropoutWrapper(lstm_cell, output_keep_prob=keep_prob)
         with tf.variable_scope("lstm_layer_%s_%d" % (type, No)):
             outputs, last_states = tf.nn.dynamic_rnn(
                 cell=lstm_cell,
@@ -165,7 +294,8 @@ class Model(object):
                 inputs=input)
         return tf.convert_to_tensor(outputs)
 
-    def add_conv_layer(self, type, No, input, filter_size, out_channels, filter_type, regularized_lambda, r_flag=True):
+    def add_conv_layer(self, type, No, input, filter_size, out_channels, filter_type, regularized_lambda,
+                       strides=[1, 1, 1, 1], r_flag=True):
         with tf.variable_scope("conv_layer_%s_%d" % (type, No)):
             W = tf.get_variable('filter', [filter_size[0], filter_size[1], input.shape[3], out_channels])
             if r_flag:
@@ -174,7 +304,7 @@ class Model(object):
             conv = tf.nn.conv2d(
                 input,
                 W,
-                strides=[1, 1, 1, 1],
+                strides=strides,
                 padding=filter_type,
                 name='conv'
             )
@@ -249,9 +379,16 @@ class Model(object):
     def add_resnet_layer(self, data, input):
         return data + input
 
+    def assign_lr(self, session, lr_value):
+        session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
+
     @property
-    def input_data(self):
+    def acc_input_data(self):
         return self._acc_input_data
+
+    @property
+    def emg_input_data(self):
+        return self._emg_input_data
 
     @property
     def targets(self):
@@ -260,6 +397,14 @@ class Model(object):
     @property
     def cost(self):
         return self._cost
+
+    @property
+    def lr(self):
+        return self._lr
+
+    @property
+    def train_op(self):
+        return self._train_op
 
     @property
     def predict_op(self):

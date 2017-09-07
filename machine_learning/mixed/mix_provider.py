@@ -15,7 +15,7 @@ class Provider(object):
     model_sample = {
         'init_scale': 0.1,
         'max_grad_norm': 5,
-        'max_epoch': 150,
+        'max_epoch': 100,
         'keep_prob': 1.0,
         'lr_decay': 0.1,
         'batch_size': 16,
@@ -26,6 +26,7 @@ class Provider(object):
     FILENAMES = ["training_data.npy", "test_data.npy"]
 
     def __init__(self, config_dir):
+        print("start parse")
         self.data_dir = ''
         self.input_compat = raw_input if sys.version_info[0] < 3 else input
         self.data_dir = ''
@@ -45,6 +46,12 @@ class Provider(object):
         data_config_dir = op.join(self.data_dir, Provider.CORPUS_CONFIG_NAME)
         with open(data_config_dir, 'r') as config_handle:
             self.data_config = json.load(config_handle)
+        try:
+            with open("outliers_config.json", 'r') as config_handle:
+                self.outlier_config = json.load(config_handle)
+        except:
+            self.outlier_config = []
+        print(len(self.outlier_config))
         self.model_config = Provider.model_sample
         self.model_config["batch_size"] = self.batch_size = config['batch_size']
         self.model_config["input_size"] = self.input_size = config["input_size"]
@@ -70,6 +77,14 @@ class Provider(object):
         self.output_type = config["output_type"]
         print("finish parsing config")
 
+    def is_outlier(self, sub_data):
+        outlier_data = ",".join([str(sub_data[2]), str(sub_data[3]), str(sub_data[4])])
+        if outlier_data in self.outlier_config:
+            # print(outlier_data)
+            return True
+        else:
+            return False
+
     def get_trainable_data(self, data):
         if self.output_type == 0:
             return [np.array(list(data[:, 0])), np.array(list(data[:, 1]))]
@@ -81,6 +96,8 @@ class Provider(object):
                 if sub_data[2] in self.ignored_gestures:
                     continue
                 if sub_data[3] in self.ignored_users:
+                    continue
+                if self.is_outlier(sub_data):
                     continue
                 new_data.append(sub_data)
                 acc_x_list.append(sub_data[0][0])

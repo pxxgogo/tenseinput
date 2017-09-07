@@ -8,18 +8,10 @@ import json
 import numpy as np
 import tensorflow as tf
 import argparse
-from datetime import datetime
 import matplotlib.pyplot as pl
 
 from mix_provider import Provider
-
-flags = tf.flags
-logging = tf.logging
-
-flags.DEFINE_bool("use_fp16", False,
-                  "Train using 16-bit floats instead of 32bit floats")
-
-FLAGS = flags.FLAGS
+from mix_model import Model
 
 fig, axes = pl.subplots(2, 1, sharex=True)
 # print(axes)
@@ -28,386 +20,6 @@ fig, axes = pl.subplots(2, 1, sharex=True)
 axes[0].set_ylim([-0.25, 5])
 axes[1].set_ylim([-0.25, 5])
 lines = []
-
-
-def data_type():
-    return tf.float16 if FLAGS.use_fp16 else tf.float32
-
-
-class Model(object):
-    """The RNN model."""
-
-    def __init__(self, is_training, config):
-        self.batch_size = config['batch_size']
-        self.input_size = config['input_size']
-        self.output_size = config['output_size']
-        self.input_channel = config['input_channel']
-        self.acc_model_structure = config['acc_model_structure']
-        self.emg_model_structure = config['emg_model_structure']
-        self.acc_regularized_lambda = config.get("acc_regularized_lambda", 0.5)
-        self.emg_regularized_lambda = config.get("emg_regularized_lambda", 0.5)
-        self.regularized_flag = config.get("regularized_flag", True)
-        self.multi_window_flag = config.get("multi_window_flag", 0)
-        self.acc_sequence_flag = config.get("acc_sequence_flag", True)
-        self.emg_sequence_flag = config.get("emg_sequence_flag", True)
-        self.sequence_size = config.get("sequence_size", [1, 1])
-        self.model_type = config.get('model_type', 0)
-        if self.acc_sequence_flag and self.multi_window_flag == 1:
-            self._acc_input_data = tf.placeholder(data_type(),
-                                                  [self.batch_size, self.sequence_size[0], self.input_channel[0],
-                                                   self.input_size[0]])
-        else:
-            self._acc_input_data = tf.placeholder(data_type(),
-                                                  [self.batch_size, self.input_channel[0], self.input_size[0]])
-        if self.emg_sequence_flag and self.multi_window_flag == 1:
-            self._emg_input_data = tf.placeholder(data_type(),
-                                                  [self.batch_size, self.sequence_size[1], self.input_channel[1],
-                                                   self.input_size[1]])
-        else:
-            self._emg_input_data = tf.placeholder(data_type(),
-                                                  [self.batch_size, self.input_channel[1], self.input_size[1]])
-        self._targets = tf.placeholder(tf.int16, [self.batch_size, self.output_size])
-        acc_data = self._acc_input_data
-
-        layer_No = 0
-        for i, layer in enumerate(self.acc_model_structure):
-            net_type = layer["net_type"]
-            repeated_times = layer.get("repeated_times", 1)
-            while repeated_times > 0:
-                if net_type == "LSTM":
-                    acc_data = self.add_lstm_layer(
-                        type='acc',
-                        No=layer_No,
-                        input=acc_data,
-                        hidden_size=layer["hidden_size"]
-                    )
-                elif net_type == "RESNET":
-                    data = self.add_resnet_layer(
-                        data=acc_data,
-                        input=self._acc_input_data)
-                elif net_type == "CNN":
-                    if len(acc_data.shape) == 3:
-                        acc_data = tf.reshape(acc_data, [self.batch_size, self.input_channel[0], -1, 1])
-                    acc_data = self.add_conv_layer(
-                        type='acc',
-                        No=layer_No,
-                        input=acc_data,
-                        filter_size=layer["filter_size"],
-                        out_channels=layer["out_channels"],
-                        filter_type=layer["filter_type"],
-                        regularized_lambda=self.acc_regularized_lambda
-                    )
-                    acc_data = self.add_pool_layer(
-                        type='acc',
-                        No=layer_No,
-                        input=acc_data,
-                        pool_size=layer["pool_size"],
-                        strides=[1, 1, 1, 1],
-                        pool_type=layer["pool_type"]
-                    )
-                elif net_type == "GCNN":
-                    if len(acc_data.shape) == 3:
-                        acc_data = tf.reshape(acc_data, [self.batch_size, self.input_channel[0], -1, 1])
-                    acc_data = self.add_conv_layer(
-                        type='acc',
-                        No=layer_No,
-                        input=acc_data,
-                        filter_size=layer["filter_size"],
-                        out_channels=layer["out_channels"],
-                        filter_type=layer["filter_type"],
-                        regularized_lambda=self.acc_regularized_lambda
-                    )
-                    acc_data_g = self.add_conv_layer(
-                        type='acc_gcnn',
-                        No=layer_No,
-                        input=acc_data,
-                        filter_size=layer["filter_size"],
-                        out_channels=layer["out_channels"],
-                        filter_type=layer["filter_type"],
-                        regularized_lambda=self.acc_regularized_lambda
-                    )
-                    acc_data = tf.multiply(acc_data, tf.sigmoid(acc_data_g))
-                    acc_data = self.add_pool_layer(
-                        type='acc',
-                        No=layer_No,
-                        input=acc_data,
-                        pool_size=layer["pool_size"],
-                        strides=[1, 1, 1, 1],
-                        pool_type=layer["pool_type"]
-                    )
-                elif net_type == "DENSE":
-                    if is_training:
-                        keep_prob = layer.get("keep_prob", 1.0)
-                    else:
-                        keep_prob = 1.0
-                    acc_data = self.add_dense_layer(
-                        type='acc',
-                        No=layer_No,
-                        input=acc_data,
-                        output_size=layer["output_size"],
-                        keep_prob=keep_prob,
-                        regularized_lambda=self.acc_regularized_lambda
-                    )
-                elif net_type == "CNN3D":
-                    if len(acc_data.shape) < 5:
-                        acc_data = tf.reshape(acc_data, [self.batch_size, self.sequence_size[0], self.input_channel[0], -1, 1])
-                    acc_data = self.add_conv3d_layer(
-                        type='acc',
-                        No=layer_No,
-                        input=acc_data,
-                        filter_size=layer["filter_size"],
-                        out_channels=layer["out_channels"],
-                        filter_type=layer["filter_type"],
-                        regularized_lambda=self.acc_regularized_lambda
-                    )
-                    acc_data = self.add_pool3d_layer(
-                        type='acc',
-                        No=layer_No,
-                        input=acc_data,
-                        pool_size=layer["pool_size"],
-                        strides=[1, 1, 1, 1, 1],
-                        pool_type=layer["pool_type"]
-                    )
-                repeated_times -= 1
-                layer_No += 1
-
-        emg_data = self._emg_input_data
-        layer_No = 0
-        for i, layer in enumerate(self.emg_model_structure):
-            net_type = layer["net_type"]
-            repeated_times = layer.get("repeated_times", 1)
-            while repeated_times > 0:
-                if net_type == "LSTM":
-                    emg_data = self.add_lstm_layer(
-                        type='emg',
-                        No=layer_No,
-                        input=emg_data,
-                        hidden_size=layer["hidden_size"]
-                    )
-                elif net_type == "RESNET":
-                    data = self.add_resnet_layer(
-                        data=emg_data,
-                        input=self._emg_input_data)
-                elif net_type == "CNN":
-                    if len(emg_data.shape) == 3:
-                        emg_data = tf.reshape(emg_data, [self.batch_size, self.input_channel[1], -1, 1])
-                    emg_data = self.add_conv_layer(
-                        type='emg',
-                        No=layer_No,
-                        input=emg_data,
-                        filter_size=layer["filter_size"],
-                        out_channels=layer["out_channels"],
-                        filter_type=layer["filter_type"],
-                        regularized_lambda=self.emg_regularized_lambda
-                    )
-                    emg_data = self.add_pool_layer(
-                        type='emg',
-                        No=layer_No,
-                        input=emg_data,
-                        pool_size=layer["pool_size"],
-                        strides=[1, 1, 1, 1],
-                        pool_type=layer["pool_type"]
-                    )
-                elif net_type == "DENSE":
-                    if is_training:
-                        keep_prob = layer.get("keep_prob", 1.0)
-                    else:
-                        keep_prob = 1.0
-                    emg_data = self.add_dense_layer(
-                        type='emg',
-                        No=layer_No,
-                        input=emg_data,
-                        output_size=layer["output_size"],
-                        keep_prob=keep_prob,
-                        regularized_lambda=self.emg_regularized_lambda
-                    )
-                elif net_type == "CNN3D":
-                    if len(emg_data.shape) < 5:
-                        emg_data = tf.reshape(emg_data, [self.batch_size, self.sequence_size[1], self.input_channel[1], -1, 1])
-                    emg_data = self.add_conv3d_layer(
-                        type='emg',
-                        No=layer_No,
-                        input=emg_data,
-                        filter_size=layer["filter_size"],
-                        out_channels=layer["out_channels"],
-                        filter_type=layer["filter_type"],
-                        regularized_lambda=self.emg_regularized_lambda
-                    )
-                    emg_data = self.add_pool3d_layer(
-                        type='emg',
-                        No=layer_No,
-                        input=emg_data,
-                        pool_size=layer["pool_size"],
-                        strides=[1, 1, 1, 1, 1],
-                        pool_type=layer["pool_type"]
-                    )
-                repeated_times -= 1
-                layer_No += 1
-
-        print(acc_data.shape)
-        print(emg_data.shape)
-        # exit()
-        acc_data = tf.reshape(acc_data, [self.batch_size, -1])
-        emg_data = tf.reshape(emg_data, [self.batch_size, -1])
-
-        if self.model_type == 0:
-            data = tf.concat([acc_data, emg_data], axis=1)
-        elif self.model_type == 1:
-            data = acc_data
-        else:
-            data = emg_data
-        softmax_w = tf.get_variable(
-            "softmax_w", [data.shape[1], self.output_size], dtype=data_type())
-        softmax_b = tf.get_variable("softmax_b", [self.output_size], dtype=data_type())
-        self.logits = logits = tf.matmul(data, softmax_w) + softmax_b
-        # print(self.logits.shape)
-        self.costs = tf.nn.softmax_cross_entropy_with_logits(labels=self._targets, logits=logits)
-        loss = tf.reduce_mean(self.costs)
-        if is_training and self.regularized_flag:
-            tf.add_to_collection("losses", loss)
-            self._cost = cost = tf.add_n(tf.get_collection("losses"))
-        else:
-            self._cost = cost = loss
-
-        self._predict_op = tf.argmax(logits, 1)
-
-        if not is_training:
-            return
-
-        self._lr = tf.Variable(0.0, trainable=False)
-        tvars = tf.trainable_variables()
-        grads, _ = tf.clip_by_global_norm(tf.gradients(cost, tvars),
-                                          config['max_grad_norm'])
-        optimizer = tf.train.AdamOptimizer(self._lr)
-        self._train_op = optimizer.apply_gradients(zip(grads, tvars))
-
-        self._new_lr = tf.placeholder(tf.float32, shape=[], name="new_learning_rate")
-        self._lr_update = tf.assign(self._lr, self._new_lr)
-
-    def add_lstm_layer(self, type, No, input, hidden_size):
-        lstm_cell = tf.contrib.rnn.BasicLSTMCell(hidden_size, forget_bias=0.0, state_is_tuple=True,
-                                                 reuse=tf.get_variable_scope().reuse)
-        with tf.variable_scope("lstm_layer_%s_%d" % (type, No)):
-            outputs, last_states = tf.nn.dynamic_rnn(
-                cell=lstm_cell,
-                dtype=data_type(),
-                inputs=input)
-        return tf.convert_to_tensor(outputs)
-
-    def add_conv_layer(self, type, No, input, filter_size, out_channels, filter_type, regularized_lambda, r_flag=True):
-        with tf.variable_scope("conv_layer_%s_%d" % (type, No)):
-            W = tf.get_variable('filter', [filter_size[0], filter_size[1], input.shape[3], out_channels])
-            if r_flag:
-                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(regularized_lambda)(W))
-            b = tf.get_variable('bias', [out_channels])
-            conv = tf.nn.conv2d(
-                input,
-                W,
-                strides=[1, 1, 1, 1],
-                padding=filter_type,
-                name='conv'
-            )
-            h = tf.nn.relu(tf.nn.bias_add(conv, b), name='relu')
-        return h
-
-    def add_conv3d_layer(self, type, No, input, filter_size, out_channels, filter_type, regularized_lambda,
-                         r_flag=True):
-        with tf.variable_scope("conv3d_layer_%s_%d" % (type, No)):
-            W = tf.get_variable('filter',
-                                [filter_size[0], filter_size[1], filter_size[2], input.shape[4], out_channels])
-            if r_flag:
-                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(regularized_lambda)(W))
-            b = tf.get_variable('bias', [out_channels])
-            conv = tf.nn.conv3d(
-                input,
-                W,
-                strides=[1, 1, 1, 1, 1],
-                padding=filter_type,
-                name='conv'
-            )
-            h = tf.nn.relu(tf.nn.bias_add(conv, b), name='relu')
-        return h
-
-    def add_pool_layer(self, type, No, input, pool_size, strides, pool_type):
-        for i in range(2):
-            if pool_size[i] == -1:
-                pool_size[i] = input.shape[1 + i]
-        with tf.variable_scope("pool_layer_%s_%d" % (type, No)):
-            pooled = tf.nn.max_pool(
-                input,
-                ksize=[1, pool_size[0], pool_size[1], 1],
-                padding=pool_type,
-                strides=strides,
-                name='pool'
-            )
-        return pooled
-
-    def add_pool3d_layer(self, type, No, input, pool_size, strides, pool_type):
-        for i in range(3):
-            if pool_size[i] == -1:
-                pool_size[i] = input.shape[1 + i]
-        with tf.variable_scope("pool_layer_%s_%d" % (type, No)):
-            pooled = tf.nn.max_pool3d(
-                input,
-                ksize=[1, pool_size[0], pool_size[1], pool_size[2], 1],
-                padding=pool_type,
-                strides=strides,
-                name='pool'
-            )
-        return pooled
-
-    def get_length(self, input):
-        ret = 1
-        for i in range(1, len(input.shape)):
-            ret *= int(input.shape[i])
-        return ret
-
-    def add_dense_layer(self, type, No, input, output_size, keep_prob, regularized_lambda, r_flag=True):
-        with tf.variable_scope("dense_layer_%s_%d" % (type, No)):
-            input_length = self.get_length(input)
-            W = tf.get_variable('dense', [input_length, output_size])
-            if r_flag:
-                tf.add_to_collection("losses", tf.contrib.layers.l2_regularizer(regularized_lambda)(W))
-            b = tf.get_variable('bias', [output_size])
-            data = tf.reshape(input, [-1, int(input_length)])
-            data = tf.nn.relu(tf.matmul(data, W) + b)
-            if keep_prob < 1.0:
-                data = tf.nn.dropout(data, keep_prob)
-        return data
-
-    def add_resnet_layer(self, data, input):
-        return data + input
-
-    def assign_lr(self, session, lr_value):
-        session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
-
-    @property
-    def acc_input_data(self):
-        return self._acc_input_data
-
-    @property
-    def emg_input_data(self):
-        return self._emg_input_data
-
-    @property
-    def targets(self):
-        return self._targets
-
-    @property
-    def cost(self):
-        return self._cost
-
-    @property
-    def lr(self):
-        return self._lr
-
-    @property
-    def train_op(self):
-        return self._train_op
-
-    @property
-    def predict_op(self):
-        return self._predict_op
 
 
 def check_ans(tags, predict_vals):
@@ -439,11 +51,11 @@ def update(deviations):
     if FIRST_DRAW:
         FIRST_DRAW = False
         for i in range(2):
-            lines.append(axes[i].plot(deviations[i][0], deviations[i][3], line_types[i], linewidth=0.1))
+           lines.append(axes[i].plot(deviations[i][0], deviations[i][3], line_types[i], linewidth=0.1))
     else:
         for i in range(2):
-            lines[i][0].set_xdata(deviations[i][0])
-            lines[i][0].set_ydata(deviations[i][3])
+           lines[i][0].set_xdata(deviations[i][0])
+           lines[i][0].set_ydata(deviations[i][3])
         fig.canvas.draw()
         fig.canvas.flush_events()
         # pl.draw()
@@ -470,7 +82,7 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
     debug_val = 0
     sum = 0
     provider.status = status
-    deviations = [[[], [], [], []], [[], [], [], []]]
+    deviations = [[[], [], [], [], []], [[], [], [], [], []]]
     for step, (x, y, gesture_types, users, sample_ids) in enumerate(provider()):
         fetches = [model.cost, model.predict_op, eval_op]
         if status == 'test':
@@ -512,7 +124,7 @@ def run_epoch(session, model, provider, status, eval_op, verbose=False):
             #        sum / (time.time() - start_time), time.time() - stage_time, right_num / sum, debug_val / sum))
             stage_time = time.time()
 
-    return np.exp(costs / iters), right_num / sum, debug_val / sum, deviations
+    return np.exp(costs / iters), right_num / sum, debug_val / sum, deviations, sum / (time.time() - start_time)
 
 
 def main():
@@ -567,11 +179,12 @@ def main():
             # m.assign_lr(session, config['learning_rate'] * lr_decay)
             m.assign_lr(session, config['learning_rate'])
             print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-            train_perplexity, precision, debug_val, _ = run_epoch(session, m, provider, 'train', m.train_op,
-                                                                  verbose=True)
-            print("TRAIN COST:", train_perplexity, "TRAIN PRECISION: %.3f (%.3f)" % (precision, debug_val))
-            test_perplexity, precision, debug_val, deviations = run_epoch(session, mtest, provider, 'test',
-                                                                          tf.no_op())
+            train_perplexity, precision, debug_val, _, speed = run_epoch(session, m, provider, 'train', m.train_op,
+                                                                         verbose=True)
+            print("TRAIN COST:", train_perplexity, "TRAIN PRECISION: %.3f (%.3f)" % (precision, debug_val),
+                  "SPEED: %.0f s" % speed)
+            test_perplexity, precision, debug_val, deviations, _ = run_epoch(session, mtest, provider, 'test',
+                                                                             tf.no_op())
             update(deviations)
             print("TEST COST:", test_perplexity, "TEST PRECISION: %.3f (%.3f)" % (precision, debug_val))
             if precision > best_precision or best_cost > test_perplexity:
@@ -590,7 +203,7 @@ def main():
             # print("Ending Time:", datetime.now())
         print("BEST PRECISION", best_precision)
         with open(statistics_path, 'w') as file_handle:
-            csv_str_list = ["models, is_tense, gesture_type, user_id, sample_id, cost"]
+            csv_str_list = ["models, is_tense, gesture_type, user_id, sample_id, cost, predict_val"]
             for statistic in statistics:
                 csv_str = ",".join(statistic)
                 csv_str_list.append(csv_str)
@@ -598,6 +211,4 @@ def main():
             file_handle.write(csv_content)
         log.close()
 
-
-if __name__ == "__main__":
-    main()
+main()

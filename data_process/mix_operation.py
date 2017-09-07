@@ -3,15 +3,14 @@ import json
 import numpy as np
 import random
 
-EMG_SPLIT_WINDOW_SIZE = 20
+EMG_SPLIT_WINDOW_SIZE = 25
 
-ACC_PADDING = 100
-ACC_SPLIT_WINDOW_SIZE = 400
+ACC_SPLIT_WINDOW_SIZE = 500
 
 CRITICAL_TIMES = 2
-CRITICAL_GESTURES = [11, 17, 10, 20, 13, 14]
+CRITICAL_GESTURES = []
 
-PRUNE_SAMPLE_TIMES = 2
+PRUNE_SAMPLE_TIMES = 1
 
 
 def prune_data(raw_data, sample_flag):

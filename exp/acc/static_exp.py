@@ -14,9 +14,7 @@ fig = plt.figure()
 fig.patches.append(mpatches.Circle([0.5, 0.5], 0.1, transform=fig.transFigure))
 
 debug_No = 0
-a = serial.Serial('/dev/ttyACM1', 115200)
-WINDOW_SIZE = 400
-SAMPLE_SIZE = 100
+a = serial.Serial('/dev/ttyACM0', 115200)
 result_window = np.zeros(1)
 result_pointer = 0
 TIMES = 1
@@ -65,10 +63,6 @@ def run(acc_operation):
     est = Estimator()
 
     a.write(b'\x01')
-    window_data = np.array([[0 for i in range(WINDOW_SIZE)], [0 for i in range(WINDOW_SIZE)],
-                            [0 for i in range(WINDOW_SIZE)]])
-    index = 0
-    sample_num = 0
     lastTp = time.time()
 
     while True:

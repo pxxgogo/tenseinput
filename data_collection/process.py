@@ -22,7 +22,7 @@ def read_data(data, offset):
 
 a = serial.Serial('/dev/ttyACM1', 115200)
 
-raw_datafile = open(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '-raw.csv', 'w')
+raw_datafile = open(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '-raw.txt', 'w')
 # datafile = open(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '.txt', 'w')
 
 a.write(b'\x01')
@@ -48,7 +48,7 @@ while True:
     old_vp = est.feed_data(dt, raw_gyr, raw_acc)
     vp = old_vp * 4096
 
-    raw_datafile.write(str(tp) + ', ' + str(raw_gyr[1]) + ', ' + str(raw_gyr[2]) + ', ' + str(raw_acc[0]) + ', ' + str(raw_acc[1]) + ', ' + str(raw_acc[2]) + ', ' + str(raw_gyr[0]) + '\n')
+    raw_datafile.write(str(tp) + ' ' + str(raw_gyr[0]) + ' ' + str(raw_gyr[1]) + ' ' + str(raw_gyr[2]) + ' ' + str(raw_acc[0]) + ' ' + str(raw_acc[1]) + ' ' + str(raw_acc[2]) + '\n')
     # datafile.write(str(ts) + ' ' + str(vp[0]) + ' ' + str(vp[1]) + ' ' + str(vp[2]) + '\n')
     print(old_vp, end='\r')
 

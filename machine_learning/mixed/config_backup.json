@@ -1,0 +1,106 @@
+{
+  "data_dir": "../../data/training_data/0906/mix_5_multi_windows",
+  "multi_window_flag": 1,
+  "batch_size": 16,
+  "model_type": 1,
+  "ignored_gestures": [],
+  "ignored_users": [],
+  "input_size": [
+    51,
+    5
+  ],
+  "output_size": 2,
+  "output_type": 1,
+  "input_channel": [
+    3,
+    6
+  ],
+  "sequence_size": [
+    5,
+    5
+  ],
+  "acc_sequence_flag": true,
+  "emg_sequence_flag": true,
+  "learning_rate": 0.0001,
+  "acc_regularized_lambda": 0.01,
+  "emg_regularized_lambda": 0.0001,
+  "regularized_flag": true,
+  "acc_model_structure": [
+    {
+      "net_type": "CNN3D",
+      "pool_size": [
+        1,
+        1,
+        5
+      ],
+      "filter_type": "VALID",
+      "pool_type": "VALID",
+      "repeated_times": 1,
+      "filter_size": [
+        2,
+        2,
+        10
+      ],
+      "out_channels": 16
+    },
+    {
+      "net_type": "CNN3D",
+      "pool_size": [
+        1,
+        1,
+        5
+      ],
+      "filter_type": "VALID",
+      "pool_type": "VALID",
+      "repeated_times": 2,
+      "filter_size": [
+        2,
+        1,
+        10
+      ],
+      "out_channels": 16
+    },
+    {
+      "net_type": "CNN3D",
+      "pool_size": [
+        1,
+        1,
+        5
+      ],
+      "filter_type": "SAME",
+      "pool_type": "VALID",
+      "repeated_times": 1,
+      "filter_size": [
+        2,
+        2,
+        10
+      ],
+      "out_channels": 16
+    },
+    {
+      "keep_prob": 0.5,
+      "net_type": "DENSE",
+      "repeated_times": 1,
+      "output_size": 128
+    }
+  ],
+  "emg_model_structure": [
+    {
+      "net_type": "CNN3D",
+      "repeated_times": 2,
+      "filter_size": [
+        2,
+        2,
+        2
+      ],
+      "out_channels": 16,
+      "pool_size": [
+        2,
+        2,
+        2
+      ],
+      "filter_type": "VALID",
+      "pool_type": "VALID"
+    }
+  ]
+}

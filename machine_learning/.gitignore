@@ -1,3 +1,4 @@
 model/*
+mixed/tmp_corpus/
 __pycache__/*
 
